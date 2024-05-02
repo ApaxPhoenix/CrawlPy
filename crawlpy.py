@@ -56,16 +56,3 @@ class CrawlPy:
     def close(self):
         """Close all connections."""
         self.http_client.close()
-
-# Create a CrawlPy instance
-crawler = CrawlPy()
-
-# Make a GET request
-response = crawler.get('https://example.com/resource')
-
-# Check the response status code
-print("Status Code:", response.status)
-
-# Read the response content
-content = response.read().decode('utf-8')
-print("Response Content:", content)
