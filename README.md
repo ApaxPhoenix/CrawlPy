@@ -61,7 +61,7 @@ CrawlPy is an open-source project developed and maintained by the community. Con
 
 ## Support
 
-For help or questions about CrawlPy, please visit our [GitHub repository](https://github.com/crawlpy/crawlpy) or join our [community chat](https://discord.gg/CrawlPy).
+For help or questions about CrawlPy, please visit our [GitHub repository](https://github.com/crawlpy/crawlpy) or join our [community chat](https://discord.gg/jU5tpK2jqf).
 
 ## License
 
