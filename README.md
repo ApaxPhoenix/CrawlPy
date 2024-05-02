@@ -29,7 +29,7 @@ pip install crawlpy
 
 ```python
 from crawlpy import CrawlPy
-       
+
 # Create a CrawlPy instance
 crawler = CrawlPy()
 
@@ -40,11 +40,8 @@ response = crawler.get('https://example.com/resource')
 print("Status Code:", response.status)
 
 # Read the response content
-content = response.content.decode('utf-8')
+content = response.read().decode('utf-8')
 print("Response Content:", content)
-
-# Close the connections when done
-crawler.close()
 ```
 
 4. Run your crawler:
