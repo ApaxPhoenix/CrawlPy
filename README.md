@@ -34,7 +34,7 @@ from crawlpy import CrawlPy
 crawler = CrawlPy()
 
 # Make a GET request
-response = crawler.get('https://example.com/resource')
+response = crawler.get('https://example.com')
 
 # Check the response status code
 print("Status Code:", response.status)
