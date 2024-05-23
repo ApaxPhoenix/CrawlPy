@@ -1,9 +1,9 @@
+import re
 import asyncio
 import aiohttp
-from urllib.parse import urlparse
 from .broadcast import Request, Response
-import re
-
+from http.client import HTTPResponse
+from typing import Optional
 
 class HTTPClient:
     """Class for managing HTTP connections."""
@@ -85,11 +85,11 @@ class HTTPClient:
 
     async def connect(self, url):
         """Establish a connection to the given URL."""
-        parsed_url = urlparse(url)
-        scheme = parsed_url.scheme.lower()
+        url_obj = urlparse(url)
+        scheme = url_obj.scheme.lower()
         if scheme not in ['http', 'https']:
             raise ValueError("Only HTTP and HTTPS protocols are supported.")
-        netloc = parsed_url.netloc
+        netloc = url_obj.netloc
         if netloc not in self.connections:
             if scheme == 'https':
                 if self.proxies:
