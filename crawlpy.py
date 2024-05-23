@@ -1,4 +1,5 @@
-import http.client
+import asyncio
+import aiohttp
 from urllib.parse import urlparse
 from .broadcast import Request, Response
 import re
@@ -82,7 +83,7 @@ class HTTPClient:
         self.connections = {}
         self.proxies = proxies
 
-    def connect(self, url):
+    async def connect(self, url):
         """Establish a connection to the given URL."""
         parsed_url = urlparse(url)
         scheme = parsed_url.scheme.lower()
@@ -92,19 +93,19 @@ class HTTPClient:
         if netloc not in self.connections:
             if scheme == 'https':
                 if self.proxies:
-                    self.connections[netloc] = http.client.HTTPSConnection(netloc, timeout=10)
+                    self.connections[netloc] = await aiohttp.TCPConnector(ssl=False).connect(url)
                 else:
-                    self.connections[netloc] = http.client.HTTPSConnection(netloc)
+                    self.connections[netloc] = await aiohttp.TCPConnector().connect(url)
             else:
                 if self.proxies:
-                    self.connections[netloc] = http.client.HTTPConnection(netloc, timeout=10)
+                    self.connections[netloc] = await aiohttp.TCPConnector(ssl=False).connect(url)
                 else:
-                    self.connections[netloc] = http.client.HTTPConnection(netloc)
+                    self.connections[netloc] = await aiohttp.TCPConnector().connect(url)
 
-    def close(self):
+    async def close(self):
         """Close all connections."""
         for connection in self.connections.values():
-            connection.close()
+            await connection.close()
         self.connections = {}
 
 
@@ -117,16 +118,19 @@ class CrawlPy:
         self.http_request = Request(self.http_client)
         self.Retriever = HTTPClient.Retriever
 
-    def get(self, url, params=None, headers=None, cookies=None):
+    async def get(self, url, params=None, headers=None, cookies=None):
         """Make a GET request."""
-        response = self.http_request.request('GET', url, params=params, headers=headers, cookies=cookies)
-        return Response(response)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers, cookies=cookies) as response:
+                return Response(await response.text())
 
-    def post(self, url, data=None, headers=None, cookies=None):
+    async def post(self, url, data=None, headers=None, cookies=None):
         """Make a POST request."""
-        response = self.http_request.request('POST', url, data=data, headers=headers, cookies=cookies)
-        return Response(response)
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=data, headers=headers, cookies=cookies) as response:
+                return Response(await response.text())
 
-    def close(self):
+    async def close(self):
         """Close all connections."""
-        self.http_client.close()
+        await self.http_client.close()
+
