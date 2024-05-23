@@ -133,4 +133,3 @@ class CrawlPy:
     async def close(self):
         """Close all connections."""
         await self.http_client.close()
-
