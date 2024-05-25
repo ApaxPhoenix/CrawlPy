@@ -1,5 +1,5 @@
-from urllib.parse import urlparse
 import json
+from urllib.parse import urlparse
 
 
 class Response:
@@ -19,9 +19,9 @@ class Response:
         """Return the HTTP response headers."""
         return self.response.headers
 
-    def read(self):
-        """Read and return the content of the HTTP response."""
-        return self.response.read()
+    async def read(self):
+        """Read and return the content of the HTTP response asynchronously."""
+        return await self.response.text()
 
 
 class Request:
@@ -31,7 +31,7 @@ class Request:
         """Initialize HTTPRequest with a connection."""
         self.connection = connection
 
-    def request(self, method, url, params=None, data=None, headers=None, cookies=None):
+    async def request(self, method, url, params=None, data=None, headers=None, cookies=None):
         """
         Make an HTTP request.
 
@@ -50,8 +50,8 @@ class Request:
         netloc = parsed_url.netloc
 
         if netloc not in self.connection.connections:
-            self.connection.connect(url)
-        connection = self.connection.connections[netloc]
+            await self.connection.connect(url)
+        connection = self.connection.connections[netloc]["session"]
 
         if headers is None:
             headers = {}
@@ -63,6 +63,5 @@ class Request:
         if params:
             url += '?' + '&'.join([f"{k}={v}" for k, v in params.items()])
 
-        connection.request(method, url, body=data, headers=headers)
-        response = connection.getresponse()
-        return Response(response)
+        async with connection.request(method, url, headers=headers, data=data) as response:
+            return Response(response)
