@@ -32,21 +32,24 @@ Dive into web crawling with CrawlPy in just a few simple steps:
     import asyncio
     from crawlpy import CrawlPy
     
-    # Create an event loop
+    # Instantiate the CrawlPy object
+    crawler = CrawlPy()
+    url = "http://example.com"
+    
+    # Get the event loop
     loop = asyncio.get_event_loop()
     
-    # Create a CrawlPy instance
-    crawler = CrawlPy()
+    # Define the asynchronous code block directly
+    try:
+        # Fetch the HTML content asynchronously
+        html_content = loop.run_until_complete(crawler.get(url))
+        print(html_content)
+    finally:
+        # Close the crawler session
+        loop.run_until_complete(crawler.close())
     
-    # Directly run coroutines in the loop
-    response = loop.run_until_complete(crawler.get('https://example.com'))
-    print("Status Code:", response.status)
-    
-    content = response.read().decode('utf-8')
-    print("Response Content:", content)
-    
-    # Close the crawler
-    loop.run_until_complete(crawler.close())
+    # Close the event loop
+    loop.close()
     ```
 
 3. **Run Your Crawler**
