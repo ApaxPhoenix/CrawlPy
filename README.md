@@ -40,7 +40,6 @@ Dive into web crawling with CrawlPy in just a few simple steps:
     
     # Directly run coroutines in the loop
     response = loop.run_until_complete(crawler.get('https://example.com'))
-    
     print("Status Code:", response.status)
     
     content = response.read().decode('utf-8')
