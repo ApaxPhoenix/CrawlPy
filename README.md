@@ -26,7 +26,7 @@ Dive into web crawling with CrawlPy in just a few simple steps:
 
 2. **Write Your Crawler**
 
-    Create a Python file for your crawler, like `crawler.py`, and let your imagination run wild with CrawlPy:
+    Create a Python file for your crawler, like `crawler.py`, and let run wildly with CrawlPy:
 
     ```python
     import asyncio
