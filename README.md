@@ -64,7 +64,7 @@ Dive into web crawling with CrawlPy in just a few simple steps:
 
 ## Want to Contribute?
 
-CrawlPy is an open-source project driven by the community. Join us in making web crawling simpler and more accessible for everyone. Check out our [contribution guidelines](CONTRIBUTING.md) to get started.
+CrawlPy is a sole open-source project, in making web crawling simpler and more accessible for everyone. Check out our [contribution guidelines](CONTRIBUTING.md) to get started.
 
 ## Need Help?
 
