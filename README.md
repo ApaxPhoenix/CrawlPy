@@ -62,14 +62,6 @@ Dive into web crawling with CrawlPy in just a few simple steps:
 
     Watch as CrawlPy fetches web content effortlessly!
 
-## Want to Contribute?
-
-CrawlPy is a sole open-source project, in making web crawling simpler and more accessible for everyone. Check out our [contribution guidelines](CONTRIBUTING.md) to get started.
-
-## Need Help?
-
-Got questions or need assistance with CrawlPy? Head over to our [GitHub repository](https://github.com/crawlpy/crawlpy) or join our [community chat](https://discord.gg/jU5tpK2jqf) for support.
-
 ## License
 
 CrawlPy is licensed under the GPL-3.0 License. For details, see [LICENSE](LICENSE).
