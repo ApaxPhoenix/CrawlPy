@@ -30,7 +30,7 @@ Dive into web crawling with CrawlPy in just a few simple steps:
 
     ```python
     import asyncio
-    from crawlpy.crawlpy import CrawlPy
+    from crawlpy import CrawlPy
     
     # Instantiate the CrawlPy object
     crawler = CrawlPy()
