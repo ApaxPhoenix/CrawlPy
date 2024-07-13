@@ -61,4 +61,4 @@ Dive into web crawling with CrawlPy in just a few simple steps:
 
 ## License
 
-CrawlPy is licensed under the MIT License. For details, see [LICENSE](LICENSE).
+CrawlPy is licensed under the CC0-1.0 License. For details, see [LICENSE](LICENSE).
