@@ -1,132 +1,120 @@
 import re
+from typing import List
 
 
 class Retriever:
     """Class for retrieving elements from HTML content."""
 
-    @staticmethod
-    def get_urls(html_content):
+    def __init__(self, html: str) -> None:
         """
-        Retrieve all URLs from the HTML content.
+        Initialize the Retriever with HTML content.
 
         Args:
-            html_content (str): The HTML content.
+            html (str): The HTML content to be processed.
+        """
+        self.html: str = html
+
+    @property
+    def urls(self) -> List[str]:
+        """
+        Retrieve all URLs from the HTML content.
 
         Returns:
             list: A list of URLs found in the HTML content.
         """
+        # Regular expression to match href values
         pattern = r'href="([^"]+)"'
-        matches = re.findall(pattern, html_content)
-        return matches
+        # Find all matches for the pattern in the HTML content
+        return re.findall(pattern, self.html)
 
-    @staticmethod
-    def get_fragments(html_content):
+    @property
+    def fragments(self) -> List[str]:
         """
         Retrieve all URL fragments from the HTML content.
-
-        Args:
-            html_content (str): The HTML content.
 
         Returns:
             list: A list of URL fragments found in the HTML content.
         """
+        # Regular expression to match fragments after #
         fragment_pattern = r'href="[^#]+#([^"]+)"'
-        fragment_matches = re.findall(fragment_pattern, html_content)
-        return fragment_matches
-
-    @staticmethod
-    def get_query_params(url):
-        """
-        Extract query parameters from the given URL.
-
-        Args:
-            url (str): The URL to extract query parameters from.
-
-        Returns:
-            dict: A dictionary containing the extracted query parameters.
-        """
-        query_params = {}
-        # Find the query string in the URL
-        query_string_match = re.search(r'\?(.*)', url)
-        if query_string_match:
-            query_string = query_string_match.group(1)
-            # Split the query string into key-value pairs
-            params = query_string.split('&')
-            for param in params:
-                # Split each key-value pair into key and value
-                key_value = param.split('=')
-                if len(key_value) == 2:
-                    key, value = key_value
-                    query_params[key] = value
-        return query_params
+        # Find all matches for fragments in the HTML content
+        return re.findall(fragment_pattern, self.html)
 
 
 class Selector:
-    """Class for selecting elements from HTML content."""
+    """Class for selecting elements from HTML content using various filters."""
 
-    @staticmethod
-    def get_elements_by_tag(html_content, tag_name):
+    def __init__(self, html: str) -> None:
         """
-        Retrieve elements from HTML content by tag name using regular expressions.
+        Initialize the Selector with HTML content.
 
         Args:
-            html_content (str): The HTML content.
-            tag_name (str): The tag name to search for (e.g., 'a', 'p', 'body').
-
-        Returns:
-            list: A list of strings containing the content of elements matching the given tag name.
+            html (str): The HTML content to be processed.
         """
-        pattern = r"<{0}.*?>(.*?)<\/{0}>".format(tag_name)
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        return matches
+        self.html: str = html
 
-    @staticmethod
-    def get_elements_by_class(html_content, class_name):
+    def get_elements_by_tag(self, tag: str) -> List[str]:
         """
-        Retrieve elements from HTML content by CSS class name using regular expressions.
+        Retrieve elements from HTML content by tag name.
 
         Args:
-            html_content (str): The HTML content.
-            class_name (str): The CSS class name to search for.
+            tag (str): The tag name to search for (e.g., 'a', 'p').
 
         Returns:
-            list: A list of strings containing the content of elements with the given CSS class.
+            List[str]: A list of strings containing the content of elements matching the given tag.
         """
-        pattern = r'class="{}"[^>]*?>(.*?)<\/[^>]+>'.format(class_name)
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        return matches
+        # Regular expression to match content between the specified tags
+        pattern = r"<{0}.*?>(.*?)<\/{0}>".format(tag)
+        # Find all elements matching the pattern
+        return re.findall(pattern, self.html, re.DOTALL)
 
-    @staticmethod
-    def get_elements_by_id(html_content, element_id):
+    def get_elements_by_classification(self, classification: str) -> List[str]:
         """
-        Retrieve elements from HTML content by element ID using regular expressions.
+        Retrieve elements from HTML content by CSS class name.
 
         Args:
-            html_content (str): The HTML content.
-            element_id (str): The ID of the element to search for.
+            classification (str): The CSS class name to search for.
 
         Returns:
-            list: A list of strings containing the content of elements with the given ID.
+            List[str]: A list of strings containing the content of elements with the given class.
         """
-        pattern = r'id="{}"[^>]*?>(.*?)<\/[^>]+>'.format(element_id)
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        return matches
+        # Regular expression to match elements with the specified class
+        pattern = r'class="{}"[^>]*?>(.*?)<\/[^>]+>'.format(classification)
+        # Find all elements matching the pattern
+        return re.findall(pattern, self.html, re.DOTALL)
 
-    @staticmethod
-    def get_elements_by_css_selector(html_content, css_selector):
+    def get_elements_by_identification(self, identification: str) -> List[str]:
         """
-        Retrieve elements from HTML content by CSS selector using regular expressions.
+        Retrieve elements from HTML content by element identification (ID).
 
         Args:
-            html_content (str): The HTML content.
-            css_selector (str): The CSS selector to search for.
+            identification (str): The ID of the element to search for.
 
         Returns:
-            list: A list of strings containing the content of elements matching the CSS selector.
+            List[str]: A list of strings containing the content of elements with the given ID.
         """
-        selector_parts = css_selector.split()
+        # Regular expression to match elements with the specified ID
+        pattern = r'id="{}"[^>]*?>(.*?)<\/[^>]+>'.format(identification)
+        # Find all elements matching the pattern
+        return re.findall(pattern, self.html, re.DOTALL)
+
+    def get_elements_by_cascade(self, cascade: str) -> List[str]:
+        """
+        Retrieve elements from HTML content by CSS cascade selector.
+
+        Args:
+            cascade (str): The CSS selector to search for.
+
+        Returns:
+            List[str]: A list of strings containing the content of elements matching the CSS selector.
+        """
+        # Split the cascade into its parts (element, class, id)
+        selector_parts = cascade.split()
+        # Build a regex pattern to match each part of the cascade selector
         pattern = r"[\s>]+".join([r"({})".format(part) for part in selector_parts])
+        # Replace # with regex to match IDs, and . to match classes
         pattern = pattern.replace("#", r"id=\"([^\"]*)\"").replace(".", r'class=\"([^\"]*)\"')
+        # Final regex pattern to match the full CSS selector
         pattern = r"<{}.*?>(.*?)<\/{}>".format(pattern, selector_parts[-1])
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        return matches
+        # Find all elements matching the pattern
+        return re.findall(pattern, self.html, re.DOTALL)

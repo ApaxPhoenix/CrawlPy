@@ -1,28 +1,32 @@
-from .core import HTTPClient, aiohttp
-from .utils import Retriever, Selector
+import warnings
+from typing import Optional, Dict, Any
+from core import HTTPClient, aiohttp
 
 class CrawlPy:
     """Class for simplified HTTP requests."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize CrawlPy."""
-        self.http_client = HTTPClient()
-        self.Retriever = Retriever
-        self.Selector = Selector
+        self.client: Optional[HTTPClient] = None
 
-    async def get(self, url, params=None, headers=None, cookies=None):
+    async def get(
+        self,
+        url: str,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        cookies: Optional[Dict[str, str]] = None
+    ) -> Optional[str]:
         """Make a GET request."""
         try:
-            await self.http_client.connect(url)
-            async with self.http_client.session.get(url, params=params, headers=headers, cookies=cookies) as response:
+            # Use the context manager to ensure the HTTP client is managed correctly
+            async with HTTPClient(url) as self.client:
+                # Perform the GET request
+                response = await self.client.session.get(url, params=params, headers=headers, cookies=cookies)
                 return await response.text()
         except aiohttp.ClientConnectionError:
-            print("Connection closed prematurely.")
+            warnings.warn("Connection closed prematurely.")
         except Exception as error:
-            print(f"An error occurred: {error}")
+            warnings.warn(f"An error occurred: {error}")
         finally:
-            await self.http_client.close()
-
-    async def close(self):
-        """Close the HTTP client session."""
-        await self.http_client.close()
+            # No need to explicitly close the session when using the context manager
+            pass  # Context manager will handle session closure
