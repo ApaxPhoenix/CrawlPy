@@ -36,16 +36,8 @@ You can start web crawling with CrawlPy in just a few simple steps:
     # Get the event loop
     loop = asyncio.get_event_loop()
     
-    try:
-        # Fetch the HTML content asynchronously
-        html_content = loop.run_until_complete(crawler.get(url))
-        print(html_content)
-    finally:
-        # Close the crawler session
-        loop.run_until_complete(crawler.close())
-    
-    # Close the event loop
-    loop.close()
+    html = loop.run_until_complete(crawler.get(url))
+    print(html)
     ```
 
 3. **Run Your Crawler**
