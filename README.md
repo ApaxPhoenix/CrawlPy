@@ -1,55 +1,50 @@
-# CrawlPy: Lightweight Web Crawling in Python
+import asyncio
+from crawlpy import CrawlPy, Retriever, Selector
 
-CrawlPy is the perfect Python library for easy and efficient web crawling. It's designed to be simple yet powerful, making it easy to fetch and process web content for a variety of tasks.
+async def main() -> None:
+    """
+    Main asynchronous function to initialize the CrawlPy client,
+    fetch a webpage, and extract specific elements from its content.
 
-## Why Choose CrawlPy?
+    This function demonstrates:
+        - Creating a web crawler instance
+        - Fetching webpage content asynchronously
+        - Extracting and printing specific elements from the HTML
 
-- **Minimalist Design**: Lightweight and uncluttered, focusing on the essentials of web crawling without unnecessary complexity.
-- **Effortless API**: Intuitive API for making HTTP requests and processing responses easily.
-- **Flexibility**: Adaptable for various needs, whether you're scraping data, monitoring websites, or conducting research.
-- **Customization**: Full control over your requests with support for cookies and custom headers.
-
-## Getting Started
-
-You can start web crawling with CrawlPy in just a few simple steps:
-
-1. **Installation**
-
-    Install CrawlPy via pip:
-
-    ```bash
-    pip install crawlpy
-    ```
-
-2. **Write Your Crawler**
-
-    Create a Python file for your crawler, like `crawler.py`:
-
-    ```python
-    import asyncio
-    from crawlpy import CrawlPy
-    
-    # Create a CrawlPy object
+    Returns:
+        None: The function outputs the processing results to the console.
+    """
+    # Create an instance of the CrawlPy client
     crawler = CrawlPy()
+
+    # Specify the URL to fetch
     url = "http://example.com"
-    
-    # Get the event loop
-    loop = asyncio.get_event_loop()
-    
-    html = loop.run_until_complete(crawler.get(url))
-    print(html)
-    ```
 
-3. **Run Your Crawler**
+    # Fetch the HTML content of the URL asynchronously
+    html = await crawler.get(url)
 
-    Run your crawler script:
+    # Initialize Retriever and Selector instances
+    retriever = Retriever(html)
+    selector = Selector(html)
 
-    ```bash
-    python crawler.py
-    ```
+    # Extract and print all URLs from the HTML content
+    print("URLs:", retriever.urls)
 
-    And watch CrawlPy fetch web content effortlessly!
+    # Extract and print all URL fragments (e.g., #section)
+    print("Fragments:", retriever.fragments)
 
-## License
+    # Extract and print all <a> tags (links) from the HTML
+    print("Links:", selector.get_elements_by_tag("a"))
 
-CrawlPy is licensed under the CC0-1.0 License. For details, see [LICENSE](LICENSE).
+    # Extract and print elements with the specified class name
+    print("Elements with class 'example':", selector.get_elements_by_classification("example"))
+
+# Entry point of the script
+if __name__ == "__main__":
+    """
+    Run the asynchronous main function in the event loop.
+
+    This ensures the program executes the web crawling logic defined
+    in the `main` function.
+    """
+    asyncio.run(main())
