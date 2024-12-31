@@ -1,6 +1,6 @@
 # CrawlPy: Lightweight Web Crawling in Python
 
-CrawlPy is a Python library designed for easy and efficient web crawling. Whether you are scraping data, monitoring websites, or conducting research, CrawlPy's lightweight and intuitive design makes web crawling a breeze.
+A web crawler in Python with customizable rules and dynamic content handling for easy data extraction.
 
 ## Features
 
