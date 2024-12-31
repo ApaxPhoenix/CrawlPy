@@ -1,3 +1,31 @@
+# CrawlPy: Lightweight Web Crawling in Python
+
+CrawlPy is a Python library designed for easy and efficient web crawling. Whether you are scraping data, monitoring websites, or conducting research, CrawlPy's lightweight and intuitive design makes web crawling a breeze.
+
+## Features
+
+- **Minimalist Design**: Focuses on the core functionality of web crawling without unnecessary complexity.
+- **Effortless API**: Intuitive and user-friendly API for making HTTP requests and processing responses.
+- **Flexibility**: Adaptable for a wide range of web crawling needs.
+- **Customization**: Complete control over requests with support for cookies, custom headers, and more.
+
+## Getting Started
+
+Follow these simple steps to begin using CrawlPy:
+
+### Installation
+
+Install CrawlPy via pip:
+
+```bash
+pip install crawlpy
+```
+
+### Writing Your First Crawler
+
+Below is an example of how to use CrawlPy to fetch and process web content:
+
+```python
 import asyncio
 from crawlpy import CrawlPy, Retriever, Selector
 
@@ -48,3 +76,8 @@ if __name__ == "__main__":
     in the `main` function.
     """
     asyncio.run(main())
+```
+
+## License
+
+CrawlPy is licensed under the [MIT License](LICENSE), making it free for both personal and commercial use.
