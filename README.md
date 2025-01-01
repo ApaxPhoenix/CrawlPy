@@ -90,7 +90,17 @@ elements = selector.get_elements_by_classification("example")
 ### Complete Request Example
 
 ```python
-async def fetch_data():
+async def fetch():
+    """
+    Demonstrates a complete request with all available options.
+    
+    Returns:
+        Response: The response object containing the server's response.
+    
+    Raises:
+        ConnectionError: If connection to the server fails.
+        TimeoutError: If the request times out.
+    """
     url = "http://example.com/api"
     headers = {"Authorization": "Bearer token123"}
     cookies = {"user_session": "abc123"}
