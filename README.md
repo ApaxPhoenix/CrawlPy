@@ -1,83 +1,124 @@
-# CrawlPy: Lightweight Web Crawling in Python
+# CrawlPy
 
-A web crawler in Python with customizable rules and dynamic content handling for easy data extraction.
+A powerful and flexible Python library for web crawling and scraping with support for async operations, proxy management, and data extraction.
 
-## Features
+## Installation
 
-- **Minimalist Design**: Focuses on the core functionality of web crawling without unnecessary complexity.
-- **Effortless API**: Intuitive and user-friendly API for making HTTP requests and processing responses.
-- **Flexibility**: Adaptable for a wide range of web crawling needs.
-- **Customization**: Complete control over requests with support for cookies, custom headers, and more.
-
-## Getting Started
-
-Follow these simple steps to begin using CrawlPy:
-
-### Installation
-
-Install CrawlPy via pip:
+Install CrawlPy using pip:
 
 ```bash
 pip install crawlpy
 ```
 
-### Writing Your First Crawler
+## Features
 
-Below is an example of how to use CrawlPy to fetch and process web content:
+- Async HTTP requests support
+- Cookie management
+- Proxy routing
+- HTML parsing and data extraction
+- Flexible selectors for element retrieval
+
+## Basic Usage
+
+### Making HTTP Requests
+
+CrawlPy supports all standard HTTP methods (GET, POST, PUT, DELETE) through a unified async interface:
 
 ```python
-import asyncio
-from crawlpy import CrawlPy, Retriever, Selector
+from crawlpy import crawler
 
-async def main() -> None:
-    """
-    Main asynchronous function to initialize the CrawlPy client,
-    fetch a webpage, and extract specific elements from its content.
+# GET request
+url = "http://httpbin.org/get"
+response = await crawler.request("GET", url)
 
-    This function demonstrates:
-        - Creating a web crawler instance
-        - Fetching webpage content asynchronously
-        - Extracting and printing specific elements from the HTML
+# POST request with JSON data
+data = {"key": "value"}
+response = await crawler.request("POST", url, json=data)
+```
 
-    Returns:
-        None: The function outputs the processing results to the console.
-    """
-    # Create an instance of the CrawlPy client
-    crawler = CrawlPy()
+### Working with Cookies
 
-    # Specify the URL to fetch
-    url = "http://example.com"
+Manage cookies for session handling and authentication:
 
-    # Fetch the HTML content of the URL asynchronously
-    html = await crawler.get(url)
+```python
+# Send cookies with request
+cookies = {"session_id": "abc123"}
+response = await crawler.request("GET", url, cookies=cookies)
 
-    # Initialize Retriever and Selector instances
-    retriever = Retriever(html)
-    selector = Selector(html)
+# Server-side cookies are automatically handled for subsequent requests
+```
 
-    # Extract and print all URLs from the HTML content
-    print("URLs:", retriever.urls)
+### Using Proxies
 
-    # Extract and print all URL fragments (e.g., #section)
-    print("Fragments:", retriever.fragments)
+Route requests through a proxy server:
 
-    # Extract and print all <a> tags (links) from the HTML
-    print("Links:", selector.get_elements_by_tag("a"))
+```python
+proxy = "http://your_proxy:port"
+response = await crawler.request("GET", url, proxy=proxy)
+```
 
-    # Extract and print elements with the specified class name
-    print("Elements with class 'example':", selector.get_elements_by_classification("example"))
+### Data Extraction
 
-# Entry point of the script
-if __name__ == "__main__":
-    """
-    Run the asynchronous main function in the event loop.
+CrawlPy provides two powerful tools for parsing and extracting data:
 
-    This ensures the program executes the web crawling logic defined
-    in the `main` function.
-    """
-    asyncio.run(main())
+#### Retriever
+
+Extract URLs and HTML fragments:
+
+```python
+from crawlpy import Retriever
+
+retriever = Retriever(response)
+urls = retriever.urls
+fragments = retriever.fragments
+```
+
+#### Selector
+
+Extract specific elements using various selectors:
+
+```python
+from crawlpy import Selector
+
+selector = Selector(response)
+links = selector.get_elements_by_tag("a")
+elements = selector.get_elements_by_classification("example")
+```
+
+## Advanced Usage
+
+### Complete Request Example
+
+```python
+async def fetch_data():
+    url = "http://example.com/api"
+    headers = {"Authorization": "Bearer token123"}
+    cookies = {"user_session": "abc123"}
+    proxy = "http://proxy.example.com:8080"
+
+    response = await crawler.request(
+        method="POST",
+        url=url,
+        headers=headers,
+        cookies=cookies,
+        proxy=proxy,
+        json={"query": "data"}
+    )
+    
+    return response
+```
+
+### Error Handling
+
+```python
+try:
+    response = await crawler.request("GET", url)
+except ConnectionError:
+    print("Failed to connect to server")
+except TimeoutError:
+    print("Request timed out")
 ```
 
 ## License
 
-CrawlPy is licensed under the [MIT License](LICENSE), making it free for both personal and commercial use.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
