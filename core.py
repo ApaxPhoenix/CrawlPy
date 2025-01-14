@@ -5,31 +5,40 @@ from urllib.parse import urlparse
 
 
 class CrawlCore:
-    """
-    Asynchronous HTTP client for managing connections and requests.
-    Supports multiple HTTP methods like GET, POST, PUT, DELETE with headers, JSON data, and more.
-
-    This class manages the connection session, handles timeout, and manages proxies, SSL settings, and cookies.
-    """
-
-    def __init__(self, endpoint: str, duration: Optional[float] = 10, proxy: Optional[Dict] = None,
-                 ssl: Optional[bool] = None, cookies: Optional[aiohttp.CookieJar] = None) -> None:
+    def __init__(self, endpoint: str, duration: Optional[float] = 10,
+                 proxy: Optional[Dict] = None, ssl: Optional[bool] = None,
+                 cookies: Optional[aiohttp.CookieJar] = None) -> None:
         """
         Initialize the HTTP client with an endpoint, timeout, and optional proxy settings, SSL, and cookie jar.
 
         Args:
-            endpoint (str): The full URL for the HTTP connection, including the protocol (http/https).
-            duration (Optional[float], optional): Connection timeout in seconds, default is 10 seconds.
-            proxy (Optional[Dict], optional): Proxy configuration, default is None.
-            ssl (Optional[bool], optional): SSL configuration, default is None.
-            cookies (Optional[aiohttp.CookieJar], optional): Cookie jar configuration, default is None.
+            endpoint (str): The full URL for the HTTP connection, including the protocol (http/https)
+            duration (Optional[float]): Connection timeout in seconds, default is 10 seconds
+            proxy (Optional[Dict]): Proxy configuration, default is None
+            ssl (Optional[bool]): SSL verification configuration, default is None
+            cookies (Optional[aiohttp.CookieJar]): Cookie jar configuration, default is None
+
+        Raises:
+            ValueError: If endpoint doesn't start with 'http' or 'https'
+            ValueError: If duration is negative
         """
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.proxy = proxy
+        if not isinstance(endpoint, str):
+            raise TypeError("Endpoint must be a string.")
+        if not urlparse(endpoint).scheme in {'http', 'https'}:
+            raise ValueError("Endpoint must start with 'http' or 'https'.")
+        if not isinstance(duration, (int, float)) or duration <= 0:
+            raise ValueError("Duration must be a positive number.")
+        if proxy and not isinstance(proxy, dict):
+            raise TypeError("Proxy must be a dictionary or None.")
+        if cookies and not isinstance(cookies, aiohttp.CookieJar):
+            raise TypeError("Cookies must be an instance of aiohttp.CookieJar or None.")
+
         self.endpoint = endpoint
         self.duration = duration
+        self.proxy = proxy
         self.ssl = ssl
         self.cookies = cookies
+        self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self) -> "CrawlCore":
         """
@@ -63,9 +72,9 @@ class CrawlCore:
         Asynchronously exits the context and closes the session.
 
         Args:
-            exc_type (type): Exception type, if any.
-            exc_val (Exception): Exception value, if any.
-            exc_tb (traceback): Traceback of the exception, if any.
+            exc_type (type): Exception type, if any
+            exc_val (Exception): Exception value, if any
+            exc_tb (traceback): Traceback of the exception, if any
         """
         if self.session:
             await self.session.close()
@@ -76,11 +85,12 @@ class CrawlCore:
         Send an HTTP request using the specified method and URL.
 
         Args:
-            method (str): HTTP method (e.g., 'GET', 'POST', 'PUT', 'DELETE').
-            url (str): The full URL for the request.
+            method (str): HTTP method (e.g., 'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD')
+            url (str): The full URL for the request
+            **kwargs: Additional arguments to pass to the request method
 
         Returns:
-            Optional[str]: The response text if the request succeeds, otherwise None.
+            Optional[str]: The response text if the request succeeds, otherwise None
         """
         if not self.session:
             raise RuntimeError("CrawlCore session is not initialized. Use it within an 'async with' block.")
