@@ -1,6 +1,6 @@
 import warnings
 from typing import Optional, Any, Dict
-from core import CrawlCore
+from .core import CrawlCore
 
 
 class CrawlPy:
@@ -10,11 +10,6 @@ class CrawlPy:
 
     This class implements all standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE)
     and follows a similar pattern to the popular 'requests' library for ease of use.
-
-    Example:
-        client = CrawlPy(endpoint="https://api.example.com")
-        response = await client.get("/users")
-        response = await client.post("/users", json={"name": "John"})
     """
 
     def __init__(self, endpoint: Optional[str] = None, duration: Optional[float] = 10,
