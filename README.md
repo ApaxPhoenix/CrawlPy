@@ -13,9 +13,10 @@ CrawlPy offers a range of features to enhance your web crawling experience:
 - **Cookie Management**: Handle sessions and authentication seamlessly
 - **Proxy Support**: Use proxies to stay anonymous and access geo-restricted content
 - **Custom Headers**: Configure request headers for enhanced control and customization
-- **Event System**: React to crawler events in real-time
+- **Event System**: React to crawler events in real-time with simple decorators
+- **Chainable API**: Build your crawler with fluent, chainable methods
 - **Middleware Hooks**: Customize request/response processing
-- **Authentication Handlers**: Built-in support for common authentication methods
+- **Simplified Authentication**: Built-in support for common authentication methods
 
 ## Basic Usage
 Here are some examples to demonstrate how you can use CrawlPy for various tasks.
@@ -23,7 +24,10 @@ Here are some examples to demonstrate how you can use CrawlPy for various tasks.
 ### Making HTTP Requests
 CrawlPy supports all major HTTP methods, making it easy to interact with web servers:
 ```python
-from crawlpy import crawler
+from crawlpy import Crawler
+
+# Create a crawler instance
+crawler = Crawler()
 
 # Fetch a page using GET
 url = "http://httpbin.org/get"
@@ -53,6 +57,10 @@ headers = {
 
 # Use headers in a single request
 response = await crawler.get(url, headers=headers)
+
+# Or set headers globally for all requests
+crawler.headers = headers
+response = await crawler.get(url)  # Uses the preset headers
 ```
 
 ### Managing Cookies
@@ -61,6 +69,9 @@ CrawlPy makes cookie handling straightforward:
 # Send cookies with your request
 cookies = {"session_id": "abc123"}
 response = await crawler.get(url, cookies=cookies)
+
+# Set cookies globally
+crawler.cookies = cookies
 
 # Server cookies are automatically managed for subsequent requests
 ```
@@ -71,47 +82,52 @@ CrawlPy supports proxies to help you stay anonymous and bypass geo-restrictions:
 # Use a proxy for your request
 proxy = "http://your_proxy:port"
 response = await crawler.get(url, proxy=proxy)
+
+# Or set a global proxy
+crawler.proxy = proxy
 ```
 
 ## Event System
 CrawlPy provides a robust event system that allows you to react to various crawler events:
 
 ```python
-from crawlpy import crawler, events
+from crawlpy import Crawler
 
-# Register event handlers
-@events.on_request
+crawler = Crawler()
+
+# Register event handlers with simple decorators
+@crawler.on("request")
 async def handle_request(request):
     print(f"Making request to: {request.url}")
 
-@events.on_response
+@crawler.on("response")
 async def handle_response(response):
     print(f"Received response: {response.status_code}")
 
-@events.on_error
+@crawler.on("error")
 async def handle_error(error, request):
     print(f"Error occurred while processing {request.url}: {error}")
 
-# Events can also be registered using the event emitter
-crawler.events.on("request", handle_request)
-crawler.events.on("response", handle_response)
-crawler.events.on("error", handle_error)
+# Events can also be registered using the chaining API
+crawler.request(handle_request).response(handle_response).error(handle_error)
 ```
 
 ## Middleware Hooks
 Middleware hooks allow you to customize the request/response pipeline:
 
 ```python
-from crawlpy import crawler, hooks
+from crawlpy import Crawler
+
+crawler = Crawler()
 
 # Request middleware
-@hooks.before_request
+@crawler.on("before_request")
 async def modify_request(request):
     request.headers["Custom-Header"] = "Value"
     return request
 
 # Response middleware
-@hooks.after_response
+@crawler.on("after_response")
 async def process_response(response):
     if response.status_code == 200:
         # Process successful responses
@@ -119,12 +135,15 @@ async def process_response(response):
     return response
 
 # Error middleware
-@hooks.on_error
+@crawler.on("handle_error")
 async def handle_error(error, request):
     if isinstance(error, ConnectionError):
         # Retry the request
         return await request.retry()
     raise error
+
+# Middleware can also be added using the chaining API
+crawler.before(modify_request).after(process_response).handle(handle_error)
 ```
 
 ## Authentication
@@ -132,33 +151,66 @@ CrawlPy provides built-in support for common authentication methods:
 
 ### Basic Authentication
 ```python
-from crawlpy import crawler, auth
+from crawlpy import Crawler
 
-# Using basic authentication
-handler = auth.BasicAuth(username="user", password="pass")
-crawler.auth = handler
+crawler = Crawler()
+
+# Using basic authentication with simplified method
+crawler.auth.basic(username="user", password="pass")
 
 # Make authenticated requests
 response = await crawler.get("https://api.example.com/protected")
+
+# Or use a context manager for temporary authentication
+async with crawler.auth.basic("user", "pass"):
+    response = await crawler.get("https://api.example.com/protected")
 ```
 
 ### OAuth2 Authentication
 ```python
-from crawlpy import crawler, auth
+from crawlpy import Crawler
 
-# Configure OAuth2 authentication
-config = {
-    "client_id": "your_client_id",
-    "client_secret": "your_client_secret",
-    "token_url": "https://api.example.com/oauth/token",
-    "scope": ["read", "write"]
-}
+crawler = Crawler()
 
-handler = auth.OAuth2(config)
-crawler.auth = handler
+# Configure OAuth2 authentication with simplified method
+crawler.auth.oauth2(
+    id="your_client_id",
+    secret="your_client_secret",
+    endpoint="https://api.example.com/oauth/token",
+    scope=["read", "write"]
+)
 
 # Make authenticated requests
 response = await crawler.get("https://api.example.com/protected")
+
+# Or use a context manager
+async with crawler.auth.oauth2(id="id", secret="secret"):
+    response = await crawler.get("https://api.example.com/user/profile")
+```
+
+## Rule-Based Crawling
+CrawlPy offers an intuitive rule system for controlling crawl behavior:
+
+```python
+from crawlpy import Crawler
+
+crawler = Crawler()
+
+# Define rules for URLs to follow or ignore
+crawler.rule("*.example.com", follow=True)
+crawler.rule("login", ignore=True)
+crawler.rule(lambda url: "admin" in url, priority=10)
+
+# Start crawling with a single command
+results = await crawler.start(
+    urls=["https://example.com"],
+    depth=3,
+    requests=100,
+    concurrency=10
+)
+
+for result in results:
+    print(f"Crawled {result.url}: {len(result.text)} bytes")
 ```
 
 ## License
