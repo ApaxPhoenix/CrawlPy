@@ -98,7 +98,7 @@ await crawler.cookie.load("~./cookies.json")
 crawler.proxy.set("http://proxy:port")
 
 # Use a proxy for specific domains
-crawler.proxy.unique("http://example.com", "http://proxy:port")
+crawler.proxy.for("http://example.com", "http://proxy:port")
 
 # Use proxy rotation
 crawler.proxy.rotate(["http://proxy1:port", "http://proxy2:port", "http://proxy3:port"])
@@ -114,9 +114,6 @@ crawler.auth.oauth("id", "secret", "https://api.example.com/token")
 
 # API key authentication
 crawler.auth.key("key")
-
-# Custom auth scheme
-crawler.auth.custom(lambda request: request.header.add("X-Token", "token"))
 ```
 
 ### Cache Group
@@ -151,12 +148,12 @@ crawler.filter.status(200)
 crawler.filter.type("image/*")
 
 # Filter by content
-crawler.filter.item(".item")
+crawler.filter.by(".item")
 
 # Combine filters
 crawler.filter.all([
     crawler.filter.status(200),
-    crawler.filter.item(".item")
+    crawler.filter.content(".item")
 ])
 ```
 
@@ -172,7 +169,7 @@ crawler.rule.skip("login", "admin", "logout")
 crawler.rule.boost("/sale/*", level=10)
 
 # Limit crawl depth for certain paths
-crawler.rule.depth("/forum/*", max=2)
+crawler.rule.depth("/forum/*", length=2)
 ```
 
 ### Monitor Group
@@ -200,7 +197,7 @@ await watcher.stop()
 ### Download Support
 ```python
 # Download a file to disk
-await crawler.download("https://example.com/file.pdf", "local_file.pdf")
+await crawler.download("https://example.com/file.pdf", "file.pdf")
 
 # Download with progress callback
 await crawler.download(
@@ -356,56 +353,6 @@ crawler.retry.when(lambda response: "try again later" in response.text)
 
 # Disable retries for specific requests
 await crawler.get("https://example.com/noretry", retry=False)
-```
-
-## Resource Limits
-Control how CrawlPy uses system resources:
-
-```python
-# Set global limits
-crawler.limit.requests(per_second=5)
-crawler.limit.memory("500MB")
-crawler.limit.connections(max=20)
-
-# Set domain-specific limits
-crawler.limit.domain("example.com", per_second=2)
-
-# Automatically pause when reaching limits
-crawler.limit.auto_pause(True)
-
-# Monitor resource usage
-stats = await crawler.limit.stats()
-print(f"Memory usage: {stats.memory_used}/{stats.memory_limit}")
-```
-
-## Page Actions
-Simulate user interactions with web pages:
-
-```python
-# Click elements
-await crawler.page("https://example.com").click(".button")
-
-# Fill forms
-await crawler.page("https://example.com/contact").fill({
-    "name": "John Doe",
-    "email": "john@example.com",
-    "message": "Hello, world!"
-})
-
-# Submit forms
-await crawler.page("https://example.com/login").submit(
-    "#login-form",
-    {
-        "username": "user",
-        "password": "pass"
-    }
-)
-
-# Scroll the page
-await crawler.page("https://example.com/feed").scroll(to=".load-more")
-
-# Wait for elements or conditions
-await crawler.page("https://example.com/app").wait(".content-loaded")
 ```
 
 ## License
