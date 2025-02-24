@@ -121,13 +121,13 @@ from crawlpy import Crawler
 crawler = Crawler()
 
 # Request middleware
-@crawler.on("before_request")
+@crawler.on("before")
 async def modify_request(request):
     request.headers["Custom-Header"] = "Value"
     return request
 
 # Response middleware
-@crawler.on("after_response")
+@crawler.on("after")
 async def process_response(response):
     if response.status_code == 200:
         # Process successful responses
@@ -135,7 +135,7 @@ async def process_response(response):
     return response
 
 # Error middleware
-@crawler.on("handle_error")
+@crawler.on("error")
 async def handle_error(error, request):
     if isinstance(error, ConnectionError):
         # Retry the request
