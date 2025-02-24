@@ -13,10 +13,20 @@ CrawlPy offers a range of features to enhance your web crawling experience:
 - **Cookie Management**: Handle sessions and authentication seamlessly
 - **Proxy Support**: Use proxies to stay anonymous and access geo-restricted content
 - **Custom Headers**: Configure request headers for enhanced control and customization
-- **Event System**: React to crawler events in real-time with simple decorators
 - **Chainable API**: Build your crawler with fluent, chainable methods
-- **Middleware Hooks**: Customize request/response processing
 - **Simplified Authentication**: Built-in support for common authentication methods
+- **Change Detection**: Monitor websites for important changes and trigger actions
+- **Content Filtering**: Filter crawled content based on custom criteria
+- **Cache Management**: Intelligently cache responses to improve performance
+- **Advanced Rule System**: Fine-grained control over crawl behavior with powerful rules
+- **Download & Upload**: Transfer files to and from remote servers with ease
+- **Streaming Support**: Process crawled data in real-time
+- **Schema Validation**: Validate extracted data against defined schemas
+- **Retry Strategies**: Smart retry logic for failed requests
+- **Resource Limits**: Control CPU, memory and bandwidth usage
+- **Interactive Sessions**: Maintain state across multiple requests
+- **Pagination Handling**: Automatically navigate through paginated content
+- **Page Actions**: Simulate user actions like clicking and form submission
 
 ## Basic Usage
 Here are some examples to demonstrate how you can use CrawlPy for various tasks.
@@ -45,172 +55,357 @@ data = {"update": "info"}
 response = await crawler.put(url, json=data)
 ```
 
-### Managing Headers
-CrawlPy allows you to customize request headers for various purposes such as authentication, user agent specification, or content type negotiation:
+## Organized API Groups
+CrawlPy organizes related functionality into logical groups for easy access:
+
+### Headers Group
 ```python
 # Set headers for your request
-headers = {
+crawler.header.set({
     "User-Agent": "CrawlPy/1.0",
     "Accept": "application/json",
     "Authorization": "Bearer your_token_here"
-}
+})
 
-# Use headers in a single request
-response = await crawler.get(url, headers=headers)
+# Add a single header
+crawler.header.add("Referer", "https://example.com")
 
-# Or set headers globally for all requests
-crawler.headers = headers
-response = await crawler.get(url)  # Uses the preset headers
+# Use a preset user agent
+crawler.header.agent("chrome")  # Preset Chrome user agent
 ```
 
-### Managing Cookies
-CrawlPy makes cookie handling straightforward:
+### Cookies Group
 ```python
-# Send cookies with your request
-cookies = {"session_id": "abc123"}
-response = await crawler.get(url, cookies=cookies)
+# Set cookies for all requests
+crawler.cookie.set({"id": "abc123"})
 
-# Set cookies globally
-crawler.cookies = cookies
+# Add a single cookie
+crawler.cookie.add("preference", "dark-mode")
 
-# Server cookies are automatically managed for subsequent requests
+# Clear all cookies
+crawler.cookie.clear()
+
+# Export cookies to a file
+await crawler.cookie.save("~./cookies.json")
+
+# Import cookies from a file
+await crawler.cookie.load("~./cookies.json")
 ```
 
-### Using Proxies
-CrawlPy supports proxies to help you stay anonymous and bypass geo-restrictions:
+### Proxy Group
 ```python
-# Use a proxy for your request
-proxy = "http://your_proxy:port"
-response = await crawler.get(url, proxy=proxy)
+# Set a proxy for all requests
+crawler.proxy.set("http://proxy:port")
 
-# Or set a global proxy
-crawler.proxy = proxy
+# Use a proxy for specific domains
+crawler.proxy.unique("http://example.com", "http://proxy:port")
+
+# Use proxy rotation
+crawler.proxy.rotate(["http://proxy1:port", "http://proxy2:port", "http://proxy3:port"])
 ```
 
-## Event System
-CrawlPy provides a robust event system that allows you to react to various crawler events:
-
+### Auth Group
 ```python
-from crawlpy import Crawler
+# Basic authentication
+crawler.auth.basic("username", "password")
 
-crawler = Crawler()
+# OAuth2 authentication
+crawler.auth.oauth("id", "secret", "https://api.example.com/token")
 
-# Register event handlers with simple decorators
-@crawler.on("request")
-async def handle_request(request):
-    print(f"Making request to: {request.url}")
+# API key authentication
+crawler.auth.key("key")
 
-@crawler.on("response")
-async def handle_response(response):
-    print(f"Received response: {response.status_code}")
-
-@crawler.on("error")
-async def handle_error(error, request):
-    print(f"Error occurred while processing {request.url}: {error}")
-
-# Events can also be registered using the chaining API
-crawler.request(handle_request).response(handle_response).error(handle_error)
+# Custom auth scheme
+crawler.auth.custom(lambda request: request.header.add("X-Token", "token"))
 ```
 
-## Middleware Hooks
-Middleware hooks allow you to customize the request/response pipeline:
-
+### Cache Group
 ```python
-from crawlpy import Crawler
+# Enable caching
+crawler.cache.on()
 
-crawler = Crawler()
+# Configure cache settings
+crawler.cache.setup(
+    path="~./cache",
+    limit="500MB",
+    ttl="4h"
+)
 
-# Request middleware
-@crawler.on("before")
-async def modify_request(request):
-    request.headers["Custom-Header"] = "Value"
-    return request
+# Set expiration rules
+crawler.cache.expire({
+    "html": "1h",
+    "json": "30m",
+    "image": "7d"
+})
 
-# Response middleware
-@crawler.on("after")
-async def process_response(response):
-    if response.status_code == 200:
-        # Process successful responses
-        pass
-    return response
-
-# Error middleware
-@crawler.on("error")
-async def handle_error(error, request):
-    if isinstance(error, ConnectionError):
-        # Retry the request
-        return await request.retry()
-    raise error
-
-# Middleware can also be added using the chaining API
-crawler.before(modify_request).after(process_response).handle(handle_error)
+# Clear cache
+crawler.cache.clear()
 ```
 
-## Authentication
-CrawlPy provides built-in support for common authentication methods:
-
-### Basic Authentication
+### Filter Group
 ```python
-from crawlpy import Crawler
+# Filter by status code
+crawler.filter.status(200)
 
-crawler = Crawler()
+# Filter by content type
+crawler.filter.type("image/*")
 
-# Using basic authentication with simplified method
-crawler.auth.basic(username="user", password="pass")
+# Filter by content
+crawler.filter.item(".item")
 
-# Make authenticated requests
-response = await crawler.get("https://api.example.com/protected")
-
-# Or use a context manager for temporary authentication
-async with crawler.auth.basic("user", "pass"):
-    response = await crawler.get("https://api.example.com/protected")
+# Combine filters
+crawler.filter.all([
+    crawler.filter.status(200),
+    crawler.filter.item(".item")
+])
 ```
 
-### OAuth2 Authentication
+### Rule Group
 ```python
-from crawlpy import Crawler
+# Follow specific URLs
+crawler.rule.follow("*.example.com/product/*")
 
-crawler = Crawler()
+# Ignore specific URLs
+crawler.rule.skip("login", "admin", "logout")
 
-# Configure OAuth2 authentication with simplified method
-crawler.auth.oauth2(
-    id="your_client_id",
-    secret="your_client_secret",
-    endpoint="https://api.example.com/oauth/token",
-    scope=["read", "write"]
+# Set priority for certain paths
+crawler.rule.boost("/sale/*", level=10)
+
+# Limit crawl depth for certain paths
+crawler.rule.depth("/forum/*", max=2)
+```
+
+### Monitor Group
+```python
+# Monitor a page for any changes
+watcher = crawler.monitor.page("https://example.com/prices")
+
+# React to changes
+@watcher.on_change(".price")
+async def price_updated(old, new, url):
+    print(f"Price changed from {old} to {new}")
+    
+# Check for changes manually
+changes = await watcher.check()
+
+# Start automatic monitoring
+await watcher.start(every="15m")
+
+# Stop monitoring
+await watcher.stop()
+```
+
+## File Operations
+
+### Download Support
+```python
+# Download a file to disk
+await crawler.download("https://example.com/file.pdf", "local_file.pdf")
+
+# Download with progress callback
+await crawler.download(
+    "https://example.com/large-file.zip",
+    "local-file.zip",
+    progress=lambda done, total: print(f"Downloaded {done/total*100:.1f}%")
+)
+
+# Download multiple files
+files = [
+    "https://example.com/file1.pdf",
+    "https://example.com/file2.pdf"
+]
+await crawler.download.batch(files, "./downloads/")
+
+# Resume partial downloads
+await crawler.download.resume("https://example.com/large-file.zip", "partial-file.zip")
+```
+
+### Upload Support
+```python
+# Upload a file
+await crawler.upload("local-file.pdf", "https://example.com/upload")
+
+# Upload with custom form field name
+await crawler.upload(
+    "profile.jpg",
+    "https://example.com/profile-picture",
+    field="avatar"
+)
+
+# Upload multiple files
+files = [
+    "document1.pdf",
+    "document2.pdf"
+]
+await crawler.upload.batch(files, "https://example.com/documents")
+
+# Upload with progress tracking
+await crawler.upload(
+    "large-file.zip",
+    "https://example.com/upload",
+    progress=lambda sent, total: print(f"Uploaded {sent/total*100:.1f}%")
+)
+```
+
+## Streaming Support
+Process data as it's crawled, ideal for handling large datasets:
+
+```python
+# Stream results as they are crawled
+async for page in crawler.stream("https://example.com"):
+    print(f"Crawled: {page.url}")
+    
+# Stream with filtering
+async for product in crawler.stream("https://store.example.com", filter=".product"):
+    print(f"Found product: {product.text('.title')}")
+    
+# Stream with transformation
+async for item in crawler.stream("https://api.example.com/items", transform=lambda x: x.json()):
+    save_to_database(item)
+
+# Paginated streaming
+async for result in crawler.stream.pages(
+    "https://api.example.com/search",
+    next_page=".pagination .next",
+    max_pages=5
+):
+    process_search_result(result)
+```
+
+## Schema Validation
+Define and validate data structures with simple schema definitions:
+
+```python
+# Define a schema
+product_schema = crawler.schema({
+    "name": "string:required",
+    "price": "number:required",
+    "description": "string",
+    "in_stock": "boolean:required",
+    "variants": ["object"],
+    "tags": ["string"]
+})
+
+# Extract data with schema validation
+products = await crawler.get("https://store.example.com").extract(".product", schema=product_schema)
+
+# Handle validation errors
+try:
+    products = await crawler.get("https://store.example.com").extract(".product", schema=product_schema)
+except crawler.SchemaError as e:
+    print(f"Validation failed: {e.errors}")
+    
+# Transform data during validation
+size_schema = crawler.schema({
+    "value": "string:required",
+    "unit": "string:required"
+}, transform=lambda data: {
+    "value": data.split()[0],
+    "unit": data.split()[1]
+})
+```
+
+## Session Management
+Maintain state across multiple requests:
+
+```python
+# Create a session
+session = crawler.session()
+
+# Login to a website
+await session.login(
+    "https://example.com/login",
+    username="user",
+    password="pass"
 )
 
 # Make authenticated requests
-response = await crawler.get("https://api.example.com/protected")
+profile = await session.get("https://example.com/profile")
 
-# Or use a context manager
-async with crawler.auth.oauth2(id="id", secret="secret"):
-    response = await crawler.get("https://api.example.com/user/profile")
+# Check if logged in
+if await session.check(".logout-button"):
+    print("Successfully logged in")
+    
+# Save session for later
+await session.save("my-session.json")
+
+# Load a previously saved session
+await session.load("my-session.json")
 ```
 
-## Rule-Based Crawling
-CrawlPy offers an intuitive rule system for controlling crawl behavior:
+## Retry Strategies
+Smart handling of request failures:
 
 ```python
-from crawlpy import Crawler
-
-crawler = Crawler()
-
-# Define rules for URLs to follow or ignore
-crawler.rule("*.example.com", follow=True)
-crawler.rule("login", ignore=True)
-crawler.rule(lambda url: "admin" in url, priority=10)
-
-# Start crawling with a single command
-results = await crawler.start(
-    urls=["https://example.com"],
-    depth=3,
-    requests=100,
-    concurrency=10
+# Set up retry behavior
+crawler.retry.setup(
+    attempts=3,
+    wait="2s",
+    codes=[500, 502, 503, 504]
 )
 
-for result in results:
-    print(f"Crawled {result.url}: {len(result.text)} bytes")
+# Use exponential backoff
+crawler.retry.backoff(
+    base="1s",
+    factor=2,
+    max="30s"
+)
+
+# Retry with custom condition
+crawler.retry.when(lambda response: "try again later" in response.text)
+
+# Disable retries for specific requests
+await crawler.get("https://example.com/noretry", retry=False)
+```
+
+## Resource Limits
+Control how CrawlPy uses system resources:
+
+```python
+# Set global limits
+crawler.limit.requests(per_second=5)
+crawler.limit.memory("500MB")
+crawler.limit.connections(max=20)
+
+# Set domain-specific limits
+crawler.limit.domain("example.com", per_second=2)
+
+# Automatically pause when reaching limits
+crawler.limit.auto_pause(True)
+
+# Monitor resource usage
+stats = await crawler.limit.stats()
+print(f"Memory usage: {stats.memory_used}/{stats.memory_limit}")
+```
+
+## Page Actions
+Simulate user interactions with web pages:
+
+```python
+# Click elements
+await crawler.page("https://example.com").click(".button")
+
+# Fill forms
+await crawler.page("https://example.com/contact").fill({
+    "name": "John Doe",
+    "email": "john@example.com",
+    "message": "Hello, world!"
+})
+
+# Submit forms
+await crawler.page("https://example.com/login").submit(
+    "#login-form",
+    {
+        "username": "user",
+        "password": "pass"
+    }
+)
+
+# Scroll the page
+await crawler.page("https://example.com/feed").scroll(to=".load-more")
+
+# Wait for elements or conditions
+await crawler.page("https://example.com/app").wait(".content-loaded")
 ```
 
 ## License
