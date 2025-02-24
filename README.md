@@ -161,19 +161,5 @@ crawler.auth = handler
 response = await crawler.get("https://api.example.com/protected")
 ```
 
-### Custom Authentication
-```python
-from crawlpy import crawler, auth
-
-class CustomAuth(auth.BaseAuth):
-    async def authenticate(self, request):
-        # Add custom authentication logic
-        request.headers["X-Custom-Auth"] = "token"
-        return request
-
-# Use custom authentication
-crawler.auth = CustomAuth()
-```
-
 ## License
 CrawlPy is open source and available under the MIT License. For more details, please refer to the [LICENSE](LICENSE) file.
