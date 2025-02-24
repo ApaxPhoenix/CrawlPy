@@ -135,8 +135,8 @@ CrawlPy provides built-in support for common authentication methods:
 from crawlpy import crawler, auth
 
 # Using basic authentication
-auth_handler = auth.BasicAuth(username="user", password="pass")
-crawler.auth = auth_handler
+handler = auth.BasicAuth(username="user", password="pass")
+crawler.auth = handler
 
 # Make authenticated requests
 response = await crawler.get("https://api.example.com/protected")
@@ -147,15 +147,15 @@ response = await crawler.get("https://api.example.com/protected")
 from crawlpy import crawler, auth
 
 # Configure OAuth2 authentication
-oauth2_config = {
+config = {
     "client_id": "your_client_id",
     "client_secret": "your_client_secret",
     "token_url": "https://api.example.com/oauth/token",
     "scope": ["read", "write"]
 }
 
-auth_handler = auth.OAuth2(oauth2_config)
-crawler.auth = auth_handler
+handler = auth.OAuth2(config)
+crawler.auth = handler
 
 # Make authenticated requests
 response = await crawler.get("https://api.example.com/protected")
