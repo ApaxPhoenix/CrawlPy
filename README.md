@@ -9,10 +9,13 @@ pip install crawlpy
 
 ## Features
 CrawlPy offers a range of features to enhance your web crawling experience:
-- **Asynchronous Requests**: Perform multiple requests simultaneously for faster crawling.
-- **Cookie Management**: Handle sessions and authentication seamlessly.
-- **Proxy Support**: Use proxies to stay anonymous and access geo-restricted content.
-- **Custom Headers**: Configure request headers for enhanced control and customization.
+- **Asynchronous Requests**: Perform multiple requests simultaneously for faster crawling
+- **Cookie Management**: Handle sessions and authentication seamlessly
+- **Proxy Support**: Use proxies to stay anonymous and access geo-restricted content
+- **Custom Headers**: Configure request headers for enhanced control and customization
+- **Event System**: React to crawler events in real-time
+- **Middleware Hooks**: Customize request/response processing
+- **Authentication Handlers**: Built-in support for common authentication methods
 
 ## Basic Usage
 Here are some examples to demonstrate how you can use CrawlPy for various tasks.
@@ -40,7 +43,6 @@ response = await crawler.put(url, json=data)
 
 ### Managing Headers
 CrawlPy allows you to customize request headers for various purposes such as authentication, user agent specification, or content type negotiation:
-
 ```python
 # Set headers for your request
 headers = {
@@ -51,9 +53,6 @@ headers = {
 
 # Use headers in a single request
 response = await crawler.get(url, headers=headers)
-
-# Get response headers
-type = response.headers.get("content-type")
 ```
 
 ### Managing Cookies
@@ -72,6 +71,108 @@ CrawlPy supports proxies to help you stay anonymous and bypass geo-restrictions:
 # Use a proxy for your request
 proxy = "http://your_proxy:port"
 response = await crawler.get(url, proxy=proxy)
+```
+
+## Event System
+CrawlPy provides a robust event system that allows you to react to various crawler events:
+
+```python
+from crawlpy import crawler, events
+
+# Register event handlers
+@events.on_request
+async def handle_request(request):
+    print(f"Making request to: {request.url}")
+
+@events.on_response
+async def handle_response(response):
+    print(f"Received response: {response.status_code}")
+
+@events.on_error
+async def handle_error(error, request):
+    print(f"Error occurred while processing {request.url}: {error}")
+
+# Events can also be registered using the event emitter
+crawler.events.on("request", handle_request)
+crawler.events.on("response", handle_response)
+crawler.events.on("error", handle_error)
+```
+
+## Middleware Hooks
+Middleware hooks allow you to customize the request/response pipeline:
+
+```python
+from crawlpy import crawler, hooks
+
+# Request middleware
+@hooks.before_request
+async def modify_request(request):
+    request.headers["Custom-Header"] = "Value"
+    return request
+
+# Response middleware
+@hooks.after_response
+async def process_response(response):
+    if response.status_code == 200:
+        # Process successful responses
+        pass
+    return response
+
+# Error middleware
+@hooks.on_error
+async def handle_error(error, request):
+    if isinstance(error, ConnectionError):
+        # Retry the request
+        return await request.retry()
+    raise error
+```
+
+## Authentication
+CrawlPy provides built-in support for common authentication methods:
+
+### Basic Authentication
+```python
+from crawlpy import crawler, auth
+
+# Using basic authentication
+auth_handler = auth.BasicAuth(username="user", password="pass")
+crawler.auth = auth_handler
+
+# Make authenticated requests
+response = await crawler.get("https://api.example.com/protected")
+```
+
+### OAuth2 Authentication
+```python
+from crawlpy import crawler, auth
+
+# Configure OAuth2 authentication
+oauth2_config = {
+    "client_id": "your_client_id",
+    "client_secret": "your_client_secret",
+    "token_url": "https://api.example.com/oauth/token",
+    "scope": ["read", "write"]
+}
+
+auth_handler = auth.OAuth2(oauth2_config)
+crawler.auth = auth_handler
+
+# Make authenticated requests
+response = await crawler.get("https://api.example.com/protected")
+```
+
+### Custom Authentication
+```python
+from crawlpy import crawler, auth
+
+class CustomAuth(auth.BaseAuth):
+    async def authenticate(self, request):
+        # Add custom authentication logic
+        request.headers["X-Custom-Auth"] = "token"
+        return request
+
+# Use custom authentication
+crawler.auth = CustomAuth()
 ```
 
 ## License
