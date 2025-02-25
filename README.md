@@ -93,25 +93,13 @@ crawler.proxy.for("http://example.com", "http://proxy:port")
 crawler.proxy.rotate(["http://proxy1:port", "http://proxy2:port", "http://proxy3:port"])
 ```
 
-### JavaScript Rendering
-```python
-# Enable JavaScript execution
-await crawler.render.enable()
-
-# Set a timeout for JavaScript rendering
-await crawler.render.timeout("10s")
-
-# Capture a screenshot of a rendered page
-await crawler.render.screenshot("https://example.com", output="screenshot.png")
-```
-
 ### Monitor Group
 ```python
 # Monitor a page for any changes
-watcher = crawler.monitor.page("https://example.com/prices")
+monitor = crawler.monitor.page("https://example.com/prices")
 
 # React to changes
-@watcher.on_change(".price")
+@monitor.onChange(".price")
 async def price_updated(old, new, url):
     print(f"Price changed from {old} to {new}")
     
