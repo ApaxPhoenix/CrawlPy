@@ -94,7 +94,7 @@ await crawler.limit.pause(seconds=60)
 crawler.limit.resume()
 
 # Set concurrency limit 
-crawler.limit.concurrency(max_requests=10)  # Maximum 10 concurrent requests
+crawler.limit.concurrency(limit=10)  # Maximum 10 concurrent requests
 
 # Set bandwidth limit
 crawler.limit.bandwidth(kb_per_second=500)  # 500 KB/s
@@ -208,13 +208,13 @@ crawler.auth.basic(username="user", password="pass")
 
 # OAuth2 authentication
 crawler.auth.oauth2(
-    client_id="client_id",
-    client_secret="client_secret",
-    token_url="https://api.example.com/token"
+    id="client_id",
+    secret="client_secret",
+    endpoint="https://api.example.com/token"
 )
 
 # API key authentication
-crawler.auth.key(value="apikey", header_name="X-API-Key")
+crawler.auth.key(value="apikey", name="X-API-Key")
 
 # JWT authentication
 crawler.auth.jwt(token="token")
