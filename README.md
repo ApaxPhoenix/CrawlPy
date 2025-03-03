@@ -82,7 +82,7 @@ crawler.header.domains(
 crawler.limit.rate(requests_per_second=5)  # 5 requests per second
 
 # Set domain-specific rate limits
-crawler.limit.domain(limits={
+crawler.limit.domain(endpoints={
     "api.example.com": 2,  # 2 requests per second
     "images.example.com": 10  # 10 requests per second
 })
@@ -97,7 +97,7 @@ crawler.limit.resume()
 crawler.limit.concurrency(limit=10)  # Maximum 10 concurrent requests
 
 # Set bandwidth limit
-crawler.limit.bandwidth(kb_per_second=500)  # 500 KB/s
+crawler.limit.bandwidth(kilobytes=500)  # 500 KB/s
 ```
 
 ### Timeout Management
