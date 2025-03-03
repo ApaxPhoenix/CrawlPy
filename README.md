@@ -53,6 +53,33 @@ response = await crawler.put(url="http://httpbin.org/put", json={"update": "info
 
 ## API Reference
 
+### Streaming Functionality
+
+```python
+# Download a file in chunks
+async with crawler.stream(url="https://example.com/file.zip", path="download.zip") as stream:
+    async for chunk in stream.chunks(size=8192):
+        print(f"Downloaded {stream.done}%")
+
+# Upload a file in chunks
+async with crawler.stream.upload(url="https://example.com/upload", path="file.pdf") as stream:
+    async for chunk in stream.chunks():
+        print(f"Uploaded {stream.done}%")
+        
+# Stream large API responses
+async with crawler.stream(url="https://api.example.com/large-dataset") as stream:
+    async for chunk in stream.chunks():
+        # Process each chunk as JSON
+        items = json.loads(chunk)
+        for item in items:
+            process(item)
+            
+# Resume interrupted download
+async with crawler.stream.resume(url="https://example.com/large-file.zip", path="partial.zip") as stream:
+    async for chunk in stream.chunks():
+        print(f"Downloaded {stream.done}%")
+```
+
 ### Header Management
 
 ```python
@@ -191,34 +218,6 @@ crawler.auth.jwt(token="token")
 # Clear authentication
 crawler.auth.clear()
 ```
-
-### Streaming Functionality
-
-```python
-# Download a file in chunks
-async with crawler.stream(url="https://example.com/file.zip", path="download.zip") as stream:
-    async for chunk in stream.chunks(size=8192):
-        print(f"Downloaded {stream.done}%")
-
-# Upload a file in chunks
-async with crawler.stream.upload(url="https://example.com/upload", path="file.pdf") as stream:
-    async for chunk in stream.chunks():
-        print(f"Uploaded {stream.done}%")
-        
-# Stream large API responses
-async with crawler.stream(url="https://api.example.com/large-dataset") as stream:
-    async for chunk in stream.chunks():
-        # Process each chunk as JSON
-        items = json.loads(chunk)
-        for item in items:
-            process(item)
-            
-# Resume interrupted download
-async with crawler.stream.resume(url="https://example.com/large-file.zip", path="partial.zip") as stream:
-    async for chunk in stream.chunks():
-        print(f"Downloaded {stream.done}%")
-```
-
 
 ## License
 
