@@ -122,7 +122,7 @@ crawler.header.domains(
 
 ```python
 # Set global rate limit (requests per second)
-crawler.limit.rate(requests_per_second=5)  # 5 requests per second
+crawler.limit.rate(seconds=5)  # 5 requests per second
 
 # Set domain-specific rate limits
 crawler.limit.domain(endpoints={
@@ -148,9 +148,6 @@ crawler.limit.bandwidth(kilobytes=500)  # 500 KB/s
 ```python
 # Set global timeout for all requests
 crawler.timeout.set(seconds=30)  # 30 seconds
-
-# Set separate connect and read timeouts
-crawler.timeout.set(connect_seconds=5, read_seconds=30)
 
 # Set per-domain timeouts
 crawler.timeout.domain(timeouts={
