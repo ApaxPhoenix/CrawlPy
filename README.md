@@ -159,7 +159,7 @@ crawler.timeout.domain(timeouts={
 response = await crawler.get(url="https://example.com", timeout=None)
 
 # Set timeout for specific request types
-crawler.timeout.method(handlers={
+crawler.timeout.method(timeouts={
     "GET": 30,
     "POST": 60,
     "PUT": 90
