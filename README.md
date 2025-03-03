@@ -15,15 +15,13 @@ CrawlPy offers a range of features to enhance your web crawling experience:
 - **Asynchronous Requests**: Perform multiple requests simultaneously for faster crawling.
 - **Cookie Management**: Handle cookies and authentication seamlessly.
 - **Proxy Support**: Use proxies to stay anonymous and access geo-restricted content.
-- **Custom Headers**: Configure request headers for enhanced control and customization.
+- **Headers Handling**: Configure request headers for enhanced control and customization.
 - **Data Extraction**: Extract structured data using built-in parsers.
 - **Authentication**: Handle various authentication methods with ease.
 - **Streaming**: Stream content efficiently with chunk processing.
 - **Rate Limiting**: Configure automatic rate limiting to respect website policies.
 - **Timeout Control**: Set and manage connection timeouts for reliability.
-- **Robots.txt Compliance**: Automatically respects website crawling policies.
 - **Redirects Management**: Control how redirects are handled during crawling.
-- **Content Decompression**: Automatically handle compressed responses.
 
 ## Basic Usage
 
@@ -78,6 +76,24 @@ async with crawler.stream(url="https://api.example.com/large-dataset") as stream
 async with crawler.stream.resume(url="https://example.com/large-file.zip", path="partial.zip") as stream:
     async for chunk in stream.chunks():
         print(f"Downloaded {stream.done}%")
+```
+
+### Data Extraction
+
+```python
+# Extract structured data with CSS selectors
+data = await crawler.extract.css(url="https://example.com", selectors={
+    "title": "h1",
+    "price": ".product-price",
+    "images": ["img.product-image", "src"],
+    "description": ".product-description"
+})
+
+# Extract with XPath
+data = await crawler.extract.xpath(url="https://example.com", paths={
+    "title": "//h1/text()",
+    "links": "//a/@href"
+})
 ```
 
 ### Header Management
@@ -154,24 +170,6 @@ crawler.timeout.method(handlers={
 
 # Set idle timeout (for maintaining connections)
 crawler.timeout.idle(seconds=120)
-```
-
-### Data Extraction
-
-```python
-# Extract structured data with CSS selectors
-data = await crawler.extract.css(url="https://example.com", selectors={
-    "title": "h1",
-    "price": ".product-price",
-    "images": ["img.product-image", "src"],
-    "description": ".product-description"
-})
-
-# Extract with XPath
-data = await crawler.extract.xpath(url="https://example.com", paths={
-    "title": "//h1/text()",
-    "links": "//a/@href"
-})
 ```
 
 ### Proxy Configuration
