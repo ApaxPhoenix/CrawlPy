@@ -68,131 +68,11 @@ crawler.header.clear()
 # Get current headers
 headers = crawler.header.get()
 
-# Set headers for a specific domain
-crawler.header.domain(domain="api.example.com", headers={"Authorization": "Bearer token"})
-```
-
-### Cookie Management
-
-```python
-# Set cookies for all requests
-crawler.cookie.set(cookies={"preference": "dark-mode"})
-
-# Export/import cookies with one command
-await crawler.cookie.save(path="cookies.json")
-await crawler.cookie.load(path="cookies.json")
-
-# Get a specific cookie
-preference = crawler.cookie.get(name="preference")
-
-# Delete a specific cookie
-crawler.cookie.delete(name="preference")
-
-# Clear all cookies
-crawler.cookie.clear()
-```
-
-### Proxy Configuration
-
-```python
-# Set a single proxy
-crawler.proxy.set(proxy="http://proxy:port")
-
-# Set multiple proxies (automatically rotates through them)
-crawler.proxy.set(proxies=["http://proxy1:port", "http://proxy2:port", "http://proxy3:port"])
-
-# Set proxy with authentication
-crawler.proxy.set(proxy="http://user:pass@proxy:port")
-
-# Set proxy for specific protocol
-crawler.proxy.set(protocols={"http": "http://proxy1:port", "https": "https://proxy2:port"})
-
-# Disable proxy
-crawler.proxy.clear()
-
-# Get current proxy
-current = crawler.proxy.get()
-
-# Test proxy connection
-status = await crawler.proxy.test(proxy="http://proxy:port")
-```
-
-### Data Extraction
-
-```python
-# Extract structured data with CSS selectors
-data = await crawler.extract.css(url="https://example.com", selectors={
-    "title": "h1",
-    "price": ".product-price",
-    "images": ["img.product-image", "src"],
-    "description": ".product-description"
-})
-
-# Extract with XPath
-data = await crawler.extract.xpath(url="https://example.com", paths={
-    "title": "//h1/text()",
-    "links": "//a/@href"
-})
-
-# Extract data with JSON paths
-json_data = await crawler.extract.json(url="https://api.example.com/products")
-names = crawler.extract.path(data=json_data, path="$.products[*].name")
-
-# Extract tables from HTML
-tables = await crawler.extract.tables(url="https://example.com/data")
-
-# Extract all links from a page
-links = await crawler.extract.links(url="https://example.com")
-```
-
-### Authentication Methods
-
-```python
-# Basic authentication
-crawler.auth.basic(username="user", password="pass")
-
-# OAuth2 authentication
-crawler.auth.oauth2(
-    client_id="client_id",
-    client_secret="client_secret",
-    token_url="https://api.example.com/token"
+# Set headers for a selection domains
+crawler.header.domains(
+    endpoints=["api.example.com", "api.another.com"],
+    headers={"Authorization": "Bearer token"}
 )
-
-# API key authentication
-crawler.auth.key(value="apikey", header_name="X-API-Key")
-
-# JWT authentication
-crawler.auth.jwt(token="token")
-
-# Clear authentication
-crawler.auth.clear()
-```
-
-### Streaming Functionality
-
-```python
-# Download a file in chunks
-async with crawler.stream(url="https://example.com/file.zip", path="download.zip") as stream:
-    async for chunk in stream.chunks(size=8192):
-        print(f"Downloaded {stream.done}%")
-
-# Upload a file in chunks
-async with crawler.stream.upload(url="https://example.com/upload", path="file.pdf") as stream:
-    async for chunk in stream.chunks():
-        print(f"Uploaded {stream.done}%")
-        
-# Stream large API responses
-async with crawler.stream(url="https://api.example.com/large-dataset") as stream:
-    async for chunk in stream.chunks():
-        # Process each chunk as JSON
-        items = json.loads(chunk)
-        for item in items:
-            process(item)
-            
-# Resume interrupted download
-async with crawler.stream.resume(url="https://example.com/large-file.zip", path="partial.zip") as stream:
-    async for chunk in stream.chunks():
-        print(f"Downloaded {stream.done}%")
 ```
 
 ### Rate Limiting
@@ -249,40 +129,127 @@ crawler.timeout.method(timeouts={
 crawler.timeout.idle(seconds=120)
 ```
 
-### Redirect Management
+### Data Extraction
 
 ```python
-# Enable or disable redirect following
-crawler.redirect.follow(enabled=True)
+# Extract structured data with CSS selectors
+data = await crawler.extract.css(url="https://example.com", selectors={
+    "title": "h1",
+    "price": ".product-price",
+    "images": ["img.product-image", "src"],
+    "description": ".product-description"
+})
 
-# Set maximum number of redirects to follow
-crawler.redirect.limit(max_redirects=5)
+# Extract with XPath
+data = await crawler.extract.xpath(url="https://example.com", paths={
+    "title": "//h1/text()",
+    "links": "//a/@href"
+})
 
-# Configure domain policy for redirects
-crawler.redirect.domain_policy(same_domain_only=True)
+# Extract data with JSON paths
+json_data = await crawler.extract.json(url="https://api.example.com/products")
+names = crawler.extract.path(data=json_data, path="$.products[*].name")
 
-# Specify which status codes to handle as redirects
-crawler.redirect.status_codes(codes=[301, 302, 307])
+# Extract tables from HTML
+tables = await crawler.extract.tables(url="https://example.com/data")
+
+# Extract all links from a page
+links = await crawler.extract.links(url="https://example.com")
 ```
 
-### Cache Management
+### Proxy Configuration
 
 ```python
-# Enable response caching
-crawler.cache.enable(enabled=True)
+# Set a single proxy
+crawler.proxy.set(proxy="http://proxy:port")
 
-# Set cache expiration time
-crawler.cache.expiration(seconds=3600)  # 1 hour
+# Set multiple proxies (automatically rotates through them)
+crawler.proxy.set(proxies=["http://proxy1:port", "http://proxy2:port", "http://proxy3:port"])
 
-# Set cache storage location
-crawler.cache.location(directory="./cache")
+# Set proxy with authentication
+crawler.proxy.set(proxy="http://user:pass@proxy:port")
 
-# Clear cache
-crawler.cache.clear()
+# Set proxy for specific protocol
+crawler.proxy.set(protocols={"http": "http://proxy1:port", "https": "https://proxy2:port"})
 
-# Set cache size limit
-crawler.cache.limit(kilobytes=10^3)  # 1 MB
+# Disable proxy
+crawler.proxy.clear()
+
+# Get current proxy
+current = crawler.proxy.get()
 ```
+
+
+### Cookie Management
+
+```python
+# Set cookies for all requests
+crawler.cookie.set(cookies={"preference": "dark-mode"})
+
+# Export/import cookies with one command
+await crawler.cookie.save(path="cookies.json")
+await crawler.cookie.load(path="cookies.json")
+
+# Get a specific cookie
+preference = crawler.cookie.get(name="preference")
+
+# Delete a specific cookie
+crawler.cookie.delete(name="preference")
+
+# Clear all cookies
+crawler.cookie.clear()
+```
+
+### Authentication Methods
+
+```python
+# Basic authentication
+crawler.auth.basic(username="user", password="pass")
+
+# OAuth2 authentication
+crawler.auth.oauth2(
+    client_id="client_id",
+    client_secret="client_secret",
+    token_url="https://api.example.com/token"
+)
+
+# API key authentication
+crawler.auth.key(value="apikey", header_name="X-API-Key")
+
+# JWT authentication
+crawler.auth.jwt(token="token")
+
+# Clear authentication
+crawler.auth.clear()
+```
+
+### Streaming Functionality
+
+```python
+# Download a file in chunks
+async with crawler.stream(url="https://example.com/file.zip", path="download.zip") as stream:
+    async for chunk in stream.chunks(size=8192):
+        print(f"Downloaded {stream.done}%")
+
+# Upload a file in chunks
+async with crawler.stream.upload(url="https://example.com/upload", path="file.pdf") as stream:
+    async for chunk in stream.chunks():
+        print(f"Uploaded {stream.done}%")
+        
+# Stream large API responses
+async with crawler.stream(url="https://api.example.com/large-dataset") as stream:
+    async for chunk in stream.chunks():
+        # Process each chunk as JSON
+        items = json.loads(chunk)
+        for item in items:
+            process(item)
+            
+# Resume interrupted download
+async with crawler.stream.resume(url="https://example.com/large-file.zip", path="partial.zip") as stream:
+    async for chunk in stream.chunks():
+        print(f"Downloaded {stream.done}%")
+```
+
 
 ## License
 
