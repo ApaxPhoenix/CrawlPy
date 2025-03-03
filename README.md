@@ -119,7 +119,7 @@ crawler.timeout.domain(timeouts={
 response = await crawler.get(url="https://example.com", timeout=None)
 
 # Set timeout for specific request types
-crawler.timeout.method(timeouts={
+crawler.timeout.method(handlers={
     "GET": 30,
     "POST": 60,
     "PUT": 90
@@ -145,16 +145,6 @@ data = await crawler.extract.xpath(url="https://example.com", paths={
     "title": "//h1/text()",
     "links": "//a/@href"
 })
-
-# Extract data with JSON paths
-json_data = await crawler.extract.json(url="https://api.example.com/products")
-names = crawler.extract.path(data=json_data, path="$.products[*].name")
-
-# Extract tables from HTML
-tables = await crawler.extract.tables(url="https://example.com/data")
-
-# Extract all links from a page
-links = await crawler.extract.links(url="https://example.com")
 ```
 
 ### Proxy Configuration
@@ -177,27 +167,6 @@ crawler.proxy.clear()
 
 # Get current proxy
 current = crawler.proxy.get()
-```
-
-
-### Cookie Management
-
-```python
-# Set cookies for all requests
-crawler.cookie.set(cookies={"preference": "dark-mode"})
-
-# Export/import cookies with one command
-await crawler.cookie.save(path="cookies.json")
-await crawler.cookie.load(path="cookies.json")
-
-# Get a specific cookie
-preference = crawler.cookie.get(name="preference")
-
-# Delete a specific cookie
-crawler.cookie.delete(name="preference")
-
-# Clear all cookies
-crawler.cookie.clear()
 ```
 
 ### Authentication Methods
