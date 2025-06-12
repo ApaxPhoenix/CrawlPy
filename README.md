@@ -28,13 +28,6 @@ async def main():
         'https://httpbin.org/user-agent'
     ]
     responses = await crawlpy.get(urls)
-    
-    # Advanced features with classes
-    schema = Schema()
-    data = await schema.css(
-        url="https://example.com/products", 
-        selectors={"title": "h1.product-title"}
-    )
 
 asyncio.run(main())
 ```
