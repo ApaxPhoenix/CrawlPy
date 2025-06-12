@@ -142,10 +142,6 @@ response = await crawlpy.get('https://api.example.com/data', auth=auth)
 # JWT authentication
 auth = Auth(type='jwt', token='token')
 response = await crawlpy.get('https://api.example.com/data', auth=auth)
-
-# Custom authentication
-auth = Auth(type='custom', headers={'X-Auth': 'custom'})
-response = await crawlpy.get('https://api.example.com/data', auth=auth)
 ```
 
 ### Authentication Types
