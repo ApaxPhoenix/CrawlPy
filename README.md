@@ -1,477 +1,315 @@
 # CrawlPy
-**Modern HTTP Client Library - Like Requests, But Better**
+**Modern Async HTTP Client Library**
 
-CrawlPy is a modern async HTTP client library that combines the simplicity of requests with asynchronous performance and advanced crawling capabilities. Built for developers who need powerful web scraping, API interaction, and data extraction tools with minimal complexity.
+CrawlPy is a high-performance asynchronous HTTP client library built on Python's asyncio framework. It enables efficient concurrent HTTP requests while maintaining clean, readable code for web scraping and API interactions.
 
-## Installation
+## Quick Installation
+
 ```bash
 pip install crawlpy
 ```
 
-## Quick Start
+## Core Components
+
+CrawlPy provides several key components for comprehensive HTTP client functionality:
+
+- **Async HTTP Methods**: Full async/await support for GET, POST, PUT, DELETE, PATCH, and HEAD requests
+- **Response Objects**: Rich response handling with automatic content parsing and error detection
+- **Session Management**: Persistent connections with cookie handling and connection pooling
+- **Raw Connections**: Low-level TCP/SSL connection control for custom protocols
+- **Schema Structures**: CSS selector-based data extraction utilities
+- **Proxy Support**: Single proxy and proxy pool rotation capabilities
+
+## Basic Usage
+
+All CrawlPy methods are asynchronous and return response objects with comprehensive metadata and content parsing.
 
 ```python
-import crawlpy
 import asyncio
-from crawlpy import Session, Auth, Hook, Schema
+import crawlpy
 
-async def main():
-    # Simple requests
-    response = await crawlpy.get('https://httpbin.org/get')
-    print(response.status)  # 200
-    print(response.json())  # JSON response
-    
-    # Multiple URLs
-    urls = [
-        'https://httpbin.org/get',
-        'https://httpbin.org/ip',
-        'https://httpbin.org/user-agent'
-    ]
-    responses = await crawlpy.get(urls)
+# Execute single HTTP GET request
+resp = await crawlpy.get('https://httpbin.org/get')
+print(f"Status: {resp.status}")
+print(f"JSON: {resp.json()}")
 
-asyncio.run(main())
-```
-
-## Core HTTP Methods
-
-```python
-# GET requests
-response = await crawlpy.get('https://httpbin.org/get')
-
-# GET with params
-response = await crawlpy.get('https://httpbin.org/get', params={
-    'page': 1,
-    'limit': 50,
-    'sort': 'date'
-})
-
-# POST with JSON
-response = await crawlpy.post('https://httpbin.org/post', 
-    json={'name': 'John', 'email': 'john@example.com'}
-)
-
-# POST with form data
-response = await crawlpy.post('https://httpbin.org/post',
-    data={'user': 'john', 'pass': 'secret'}
-)
-
-# Other HTTP methods
-response = await crawlpy.put('https://httpbin.org/put', json={'id': 123})
-response = await crawlpy.delete('https://httpbin.org/delete')
-response = await crawlpy.head('https://httpbin.org/get')
-response = await crawlpy.patch('https://httpbin.org/patch', json={'status': 'active'})
-
-# Multiple URLs for any method
-urls = ['https://httpbin.org/get', 'https://httpbin.org/ip']
-responses = await crawlpy.get(urls)
-```
-
-### HTTP Method Parameters
-
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `url` | str/list[str] | Single URL or list of URLs | `'https://api.com'` or `['https://api1.com', 'https://api2.com']` |
-| `params` | dict | URL query parameters | `{'page': 1, 'limit': 50}` |
-| `headers` | dict | HTTP headers | `{'User-Agent': 'MyApp/1.0'}` |
-| `proxy` | str/list | Proxy server(s) | `'http://proxy:8080'` or `['http://p1:8080', 'http://p2:8080']` |
-| `ssl` | bool | SSL certificate verification | `True` |
-| `auth` | Auth | Authentication object | `Auth(type='basic', user='user', password='pass')` |
-| `token` | str | Bearer token | `'abc123xyz'` |
-| `cookies` | dict/Cookie | HTTP cookies | `{'session': 'abc123'}` |
-| `json` | dict | JSON payload (POST/PUT/PATCH) | `{'name': 'John', 'age': 30}` |
-| `data` | dict | Form data payload | `{'user': 'john'}` |
-| `files` | dict | File uploads | `{'upload': open('file.pdf', 'rb')}` |
-
-## Response Handling
-
-```python
-# Response handling
-response = await crawlpy.get('https://httpbin.org/json')
-
-# Status and headers
-print(response.status)          # 200
-print(response.reason)          # 'OK'
-print(response.headers)         # Response headers dict
-print(response.encoding)        # Character encoding
-
-# Content access
-print(response.text)            # Text content as string
-print(response.content)         # Raw bytes content
-print(response.json())          # Parse JSON response to dict/list
-
-# Response metadata
-print(response.url)             # Final URL after redirects
-print(response.history)         # List of redirect responses
-print(response.elapsed)         # Request duration in seconds
-print(response.size)            # Response size in bytes
-
-# Status checking
-if response.status == 200:      
-    data = response.json()
-elif response.status >= 400:
-    print(f"Error: {response.status} {response.reason}")
-    
-response.raise_for_status()     # Raise exception for 4xx/5xx
-```
-
-## Authentication
-
-```python
-from crawlpy import Auth
-
-# Basic authentication
-auth = Auth(type='basic', user='username', password='password')
-response = await crawlpy.get('https://api.example.com/data', auth=auth)
-
-# OAuth2 authentication
-auth = Auth(type='oauth2', id='client_id', secret='client_secret', 
-           endpoint='https://api.example.com/token')
-response = await crawlpy.get('https://api.example.com/data', auth=auth)
-
-# API key authentication
-auth = Auth(type='key', value='apikey', name='X-API-Key')
-response = await crawlpy.get('https://api.example.com/data', auth=auth)
-
-# JWT authentication
-auth = Auth(type='jwt', token='token')
-response = await crawlpy.get('https://api.example.com/data', auth=auth)
-```
-
-### Authentication Types
-
-| Type | Description | Parameters | Example |
-|------|-------------|------------|---------|
-| `basic` | HTTP Basic Authentication | `user`, `password` | `Auth(type='basic', user='user', password='pass')` |
-| `jwt` | JWT Bearer Token | `token` | `Auth(type='jwt', token='eyJ0eXAi...')` |
-| `oauth2` | OAuth2 Authentication | `id`, `secret`, `endpoint` | `Auth(type='oauth2', id='id', secret='secret', endpoint='url')` |
-| `key` | API Key Authentication | `value`, `name` | `Auth(type='key', value='key123', name='X-API-Key')` |
-| `custom` | Custom headers | `headers` | `Auth(type='custom', headers={'X-Auth': 'token'})` |
-
-## Schema Extraction
-
-```python
-from crawlpy import Schema
-
-schema = Schema()
-
-# Extract structured data with CSS selectors
-data = await schema.css(url="https://example.com/products", selectors={
-    "title": "h1.product-title",
-    "price": ".product-price",
-    "images": ["img.product-image", "src"],
-    "description": ".product-description",
-    "stock": ".stock-status"
-})
-
-# Extract with XPath
-data = await schema.xpath(url="https://example.com/products", paths={
-    "title": "//h1[@class='product-title']/text()",
-    "links": "//a[@class='product-link']/@href",
-    "prices": "//span[@class='price']/text()"
-})
-
-# Extract with JavaScript
-data = await schema.js(url="https://example.com/products", expressions={
-    "total": "document.querySelectorAll('.product').length",
-    "title": "document.title",
-    "data": "window.userData || {}"
-})
-
-# Extract from multiple URLs
+# Execute multiple requests concurrently
 urls = [
-    "https://example.com/product/1",
-    "https://example.com/product/2",
-    "https://example.com/product/3"
+    'https://httpbin.org/get',
+    'https://httpbin.org/ip',
+    'https://httpbin.org/user-agent'
 ]
-products = await schema.css(url=urls, selectors={
-    "name": "h1.title",
-    "price": ".price-value",
-    "rating": ".rating-score"
-})
+results = await crawlpy.get(urls)
 
-# Define reusable scheme
-scheme = schema.define({
-    "css": {
-        "title": "h1.product-title",
-        "price": ".price-value",
-        "images": ["img.product-image", "src"]
-    },
-    "xpath": {
-        "description": "//div[@class='description']/text()",
-        "rating": "//span[@class='rating']/@data-score"
-    },
-    "js": {
-        "stock": "window.productData.stock",
-        "count": "document.querySelectorAll('.recommended').length"
-    }
-})
-
-# Apply scheme to URL
-data = await schema.extract(url="https://example.com/product/123", pattern=scheme)
+for r in results:
+    print(f"Status: {r.status}, URL: {r.url}")
 ```
 
-### Schema Methods
+## HTTP Methods
 
-| Method | Description | Parameters | Example |
-|--------|-------------|------------|---------|
-| `.css()` | Extract using CSS selectors | `url`, `selectors` | `schema.css(url="...", selectors={"title": "h1"})` |
-| `.xpath()` | Extract using XPath expressions | `url`, `paths` | `schema.xpath(url="...", paths={"title": "//h1/text()"})` |
-| `.js()` | Extract using JavaScript | `url`, `expressions` | `schema.js(url="...", expressions={"count": "document.querySelectorAll('div').length"})` |
-| `.define()` | Define extraction pattern | `dict` | `schema.define({"css": {"title": "h1"}})` |
-| `.extract()` | Extract using scheme | `url`, `pattern` | `schema.extract(url="...", pattern=scheme)` |
+CrawlPy supports all standard HTTP methods with consistent async interfaces and common parameters including headers, timeouts, and authentication.
 
-## Hooks
+### GET Requests
 
 ```python
-from crawlpy import Hook
+# Execute basic GET request
+resp = await crawlpy.get('https://httpbin.org/get')
 
-hook = Hook()
+# Send GET request with query parameters
+params = {'page': 1, 'limit': 10}
+resp = await crawlpy.get('https://httpbin.org/get', params=params)
 
-@hook.before('header')
-def modify_headers(request):
-    request.headers['X-Custom-Header'] = 'MyValue'
+# Send GET request with custom headers
+headers = {'User-Agent': 'MyApp/1.0'}
+resp = await crawlpy.get('https://httpbin.org/get', headers=headers)
 
-@hook.after('error')
-def handle_response(response):
-    if response.status >= 400:
-        print(f"Error occurred: {response.status}")
-
-# Use hooks with requests
-response = await crawlpy.get('https://httpbin.org/get', hooks=hook)
-
-# Multiple URLs with hooks
+# Execute multiple GET requests simultaneously
 urls = ['https://httpbin.org/get', 'https://httpbin.org/ip']
-responses = await crawlpy.get(urls, hooks=hook)
-
-# Clear hooks
-hook.clear()
+results = await crawlpy.get(urls)
 ```
 
-### Hook Methods
+### POST Requests
 
-| Method | Description | Parameters | Example |
-|--------|-------------|------------|---------|
-| `@.before('name')` | Decorator for before request | `name`, `function` | `@hook.before('log')` |
-| `@.after('name')` | Decorator for after response | `name`, `function` | `@hook.after('log')` |
-| `.register()` | Register hook function | `name`, `function`, `type` | `hook.register('log', func, 'before')` |
-| `.clear()` | Clear all hooks | None | `hook.clear()` |
+CrawlPy automatically sets appropriate Content-Type headers based on the data format provided.
+
+```python
+# Send POST request with JSON payload
+data = {'name': 'John', 'email': 'john@example.com'}
+resp = await crawlpy.post('https://httpbin.org/post', json=data)
+
+# Submit form data via POST request
+form = {'username': 'john', 'password': 'secret'}
+resp = await crawlpy.post('https://httpbin.org/post', data=form)
+
+# Upload file through POST request
+with open('file.pdf', 'rb') as file:
+    files = {'document': file}
+    resp = await crawlpy.post('https://httpbin.org/post', files=files)
+```
+
+### Other Methods
+
+```python
+# Prepare data payload for various operations
+data = {'status': 'updated'}
+
+# Send PUT request to replace entire resource
+resp = await crawlpy.put('https://httpbin.org/put', json=data)
+
+# Send DELETE request to remove resource
+resp = await crawlpy.delete('https://httpbin.org/delete')
+
+# Send PATCH request for partial resource modification
+patch = {'status': 'partial'}
+resp = await crawlpy.patch('https://httpbin.org/patch', json=patch)
+
+# Send HEAD request to retrieve headers only
+resp = await crawlpy.head('https://httpbin.org/get')
+```
+
+## Response Objects
+
+Response objects provide comprehensive access to HTTP response data with automatic parsing and error handling.
+
+```python
+# Retrieve response from API endpoint
+resp = await crawlpy.get('https://httpbin.org/json')
+
+# Access response metadata
+status = resp.status        # HTTP status code
+headers = resp.headers      # Response headers dictionary
+url = resp.url             # Final URL after redirects
+
+# Extract response content in different formats
+text = resp.text           # Response body as string
+content = resp.content     # Response body as bytes
+data = resp.json()         # Parsed JSON response
+
+# Retrieve performance and encoding information
+elapsed = resp.elapsed     # Request duration in seconds
+encoding = resp.encoding   # Character encoding
+
+# Handle response errors
+try:
+    resp.raise_for_status()  # Raises exception for 4xx/5xx status codes
+    print(f"Success: {status}")
+except crawlpy.HTTPError as error:
+    print(f"Error: {error}")
+```
+
+## Request Preparation
+
+The request preparation system enables request building and modification before transmission, useful for inspection, batch processing, or applying transformations.
+
+```python
+# Build GET request without executing
+req = crawlpy.prepare('GET', 'https://httpbin.org/get')
+print(f"Method: {req.method}")
+print(f"URL: {req.url}")
+print(f"Headers: {req.headers}")
+
+# Construct POST request with JSON data
+data = {'user': 'john', 'pass': 'secret'}
+req = crawlpy.prepare('POST', 'https://httpbin.org/post', json=data)
+print(f"Body: {req.body}")
+
+# Build request with custom headers and parameters
+headers = {'Auth': 'Bearer token123'}
+params = {'limit': 10, 'page': 1}
+req = crawlpy.prepare('GET', 'https://api.com/data', 
+                     headers=headers, params=params)
+
+# Execute prepared request
+resp = await crawlpy.send(req)
+print(f"Status: {resp.status}")
+
+# Modify prepared request before execution
+req.headers['User-Agent'] = 'CrawlPy/1.0'
+req.url = 'https://httpbin.org/headers'
+resp = await crawlpy.send(req)
+```
+
+## Connections
+
+Direct TCP/SSL connections for custom protocols and streaming data.
+
+### Basic Connection
+
+```python
+# Connect to server
+connection = await crawlpy.connection('httpbin.org', 443, ssl=True)
+
+# Send HTTP request
+await connection.write(b'GET /get HTTP/1.1\r\n')
+await connection.write(b'Host: httpbin.org\r\n\r\n')
+
+# Read response
+data = await connection.read()
+print(f"Response: {data.decode()[:200]}...")
+
+await connection.close()
+```
+
+### Streaming
+
+```python
+# Stream large responses
+connection = await crawlpy.connection('httpbin.org', 443, ssl=True)
+await connection.write(b'GET /stream/10 HTTP/1.1\r\nHost: httpbin.org\r\n\r\n')
+
+while True:
+    chunk = await connection.read(1024)
+    if not chunk:
+        break
+    print(f"Chunk: {len(chunk)} bytes")
+
+await connection.close()
+```
 
 ## Sessions
+
+Sessions maintain cookies and connection pools across requests.
 
 ```python
 from crawlpy import Session
 
-# Create a session
-session = Session()
-
-# Configure session defaults
-session.headers.update({'User-Agent': 'MyApp/2.0'})
-session.auth = Auth(type='basic', user='username', password='password')
-session.ssl = False
-
-# Make requests with session
-response = await session.get('https://api.example.com/profile')
-response = await session.post('https://api.example.com/data', json={'key': 'value'})
-
-# Session supports multiple URLs too
-urls = ['https://api.example.com/user1', 'https://api.example.com/user2']
-responses = await session.get(urls)
-
-# Session context manager
+# Create session
 async with Session() as session:
-    session.url = 'https://api.example.com'
-    session.headers.update({'Authorization': 'Bearer token123'})
+    # Set default headers
+    session.headers.update({'User-Agent': 'CrawlPy/2.0'})
     
-    user = await session.get('/user/123')
-    posts = await session.get('/user/123/posts')
+    # Make request with session
+    resp = await session.get('https://httpbin.org/get')
+    
+    # Set base URL
+    session.base = 'https://api.example.com/v1'
+    profile = await session.get('/user/123')
+
+# Manual session management
+session = Session(timeout=30.0)
+resp = await session.get('https://httpbin.org/get')
+await session.close()
 ```
-
-### Session Configuration
-
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `url` | str | Base URL for all requests | `'https://api.example.com'` |
-| `headers` | dict | Default headers for all requests | `{'User-Agent': 'MyApp/2.0'}` |
-| `auth` | Auth | Default authentication | `Auth(type='basic', user='username', password='password')` |
-| `token` | str | Default bearer token | `'abc123xyz'` |
-| `ssl` | bool | Default SSL verification | `True` |
-| `proxy` | str/list | Default proxy server(s) | `'http://proxy:8080'` |
-| `cookies` | dict | Default cookies | `{'session_id': 'abc123'}` |
 
 ## Proxy Support
 
-```python
-from crawlpy import Proxy
+CrawlPy provides comprehensive proxy support for anonymous browsing, geo-location spoofing, and load distribution.
 
-# Single proxy
-response = await crawlpy.get('https://example.com',
+```python
+# Configure single proxy for request
+resp = await crawlpy.get(
+    'https://httpbin.org/ip',
     proxy='http://proxy.example.com:8080'
 )
 
-# Proxy with authentication
-response = await crawlpy.get('https://example.com',
-    proxy='http://user:pass@proxy.example.com:8080'
-)
+# Use authenticated proxy
+auth = 'http://user:pass@proxy.example.com:8080'
+resp = await crawlpy.get('https://httpbin.org/ip', proxy=auth)
 
-# Multiple proxies with rotation
-proxy = Proxy([
+# Configure proxy pool for automatic rotation
+pool = [
     'http://proxy1.example.com:8080',
-    'http://proxy2.example.com:8080', 
+    'http://proxy2.example.com:8080',
     'http://proxy3.example.com:8080'
-])
+]
 
-response = await crawlpy.get('https://example.com', proxy=proxy)
+# Execute request with automatic proxy rotation
+resp = await crawlpy.get('https://httpbin.org/ip', proxies=pool)
+print(f"Response: {resp.json()}")
 
-# Use proxies with multiple URLs
-urls = ['https://site1.com', 'https://site2.com', 'https://site3.com']
-responses = await crawlpy.get(urls, proxy=proxy)
+# Establish connection through proxy
+connection = await crawlpy.connection('httpbin.org', 443, ssl=True, 
+                                    proxy='http://proxy.com:8080')
+await connection.write(b'GET /ip HTTP/1.1\r\nHost: httpbin.org\r\n\r\n')
+data = await connection.read()
+await connection.close()
 ```
-
-## Cookie Management
-
-```python
-from crawlpy import Cookie
-
-# Request with cookies
-response = await crawlpy.get('https://example.com/login', 
-    cookies={'session_id': 'abc123'}
-)
-
-# Persistent cookie storage
-cookie = Cookie()
-response = await crawlpy.get('https://example.com/login', cookies=cookie)
-response = await crawlpy.get('https://example.com/dashboard', cookies=cookie)
-
-# Save/load cookies
-cookie.save('cookies.txt')
-cookie = Cookie.load('cookies.txt')
-
-# Cookie with multiple URLs
-urls = ['https://example.com/page1', 'https://example.com/page2']
-responses = await crawlpy.get(urls, cookies=cookie)
-```
-
-### Cookie Methods
-
-| Method | Description | Parameters | Example |
-|--------|-------------|------------|---------|
-| `.save()` | Save cookies to file | `filename` | `cookie.save('cookies.txt')` |
-| `.load()` | Load cookies from file | `filename` | `Cookie.load('cookies.txt')` |
-| `.update()` | Update cookies | `cookies` | `cookie.update({'session': 'abc'})` |
-| `.clear()` | Clear all cookies | None | `cookie.clear()` |
-
-## Content Format Adapters
-
-```python
-from crawlpy import Adapter
-
-# JSON adapter
-adapter = Adapter(type='json')
-response = await crawlpy.get('https://api.example.com/data', adapter=adapter)
-data = response.data  # Automatically parsed JSON
-
-# XML adapter
-adapter = Adapter(type='xml')
-response = await crawlpy.get('https://api.example.com/feed.xml', adapter=adapter)
-data = response.data  # Parsed XML to dict
-
-# CSV adapter
-adapter = Adapter(type='csv', delimiter=';', quote='"')
-response = await crawlpy.get('https://api.example.com/data.csv', adapter=adapter)
-data = response.data  # Parsed CSV to list of dicts
-
-# Use adapters with multiple URLs
-urls = ['https://api.example.com/data1.json', 'https://api.example.com/data2.json']
-responses = await crawlpy.get(urls, adapter=Adapter(type='json'))
-data = [response.data for response in responses]
-```
-
-### Adapter Types
-
-| Type | Description | Parameters | Example |
-|------|-------------|------------|---------|
-| `json` | Parse JSON responses | None | `Adapter(type='json')` |
-| `xml` | Parse XML responses | None | `Adapter(type='xml')` |
-| `csv` | Parse CSV responses | `delimiter`, `quote` | `Adapter(type='csv', delimiter=';')` |
 
 ## Error Handling
 
+CrawlPy provides specific exception types for different error conditions, enabling appropriate handling of network issues, timeouts, and HTTP errors.
+
 ```python
 import crawlpy
-from crawlpy import (
-    CrawlPyError, ConnectionError, ConnectTimeout, ReadTimeout, 
-    HTTPError, RequestError, InvalidURL, TooManyRedirects, 
-    SSLError, ProxyError, JSONDecodeError, ChunkedEncodingError,
-    ContentDecodingError, StreamConsumedError, RetryError
-)
+from crawlpy import HTTPError, Timeout, ConnectionError
 
 try:
-    response = await crawlpy.get('https://api.example.com/data')
-    response.raise_for_status()
-    return response.json()
-    
-except ConnectionError as error:
-    print(f"Failed to connect: {error}")
-    
-except ConnectTimeout as error:
-    print(f"Connection timeout: {error}")
-    
-except ReadTimeout as error:
-    print(f"Read timeout: {error}")
+    # Execute request with timeout specification
+    resp = await crawlpy.get('https://httpbin.org/status/404', timeout=10.0)
+    # Validate status code for success (200-299)
+    resp.raise_for_status()
+    return resp.json()
     
 except HTTPError as error:
-    print(f"HTTP error: {error.response.status}")
+    # Handle HTTP errors (4xx client errors, 5xx server errors)
+    status = error.response.status
+    url = error.response.url
+    print(f"HTTP Error {status} for URL: {url}")
     
-except InvalidURL as error:
-    print(f"Invalid URL: {error}")
+except Timeout as error:
+    # Handle request timeout errors
+    print(f"Timeout: {error}")
     
-except TooManyRedirects as error:
-    print(f"Too many redirects: {error}")
+except ConnectionError as error:
+    # Handle network connection failures
+    print(f"Connection failed: {error}")
     
-except SSLError as error:
+except Exception as error:
+    # Handle unexpected errors
+    print(f"Error: {error}")
+
+# Handle raw connection errors
+try:
+    connection = await crawlpy.connection('invalid.host', 443, ssl=True)
+    await connection.write(b'GET / HTTP/1.1\r\n\r\n')
+    data = await connection.read()
+    
+except ConnectionError as error:
+    print(f"Connection failed: {error}")
+    
+except crawlpy.SSLError as error:
     print(f"SSL error: {error}")
     
-except ProxyError as error:
-    print(f"Proxy error: {error}")
-    
-except JSONDecodeError as error:
-    print(f"JSON decode error: {error}")
-    
-except ChunkedEncodingError as error:
-    print(f"Chunked encoding error: {error}")
-    
-except ContentDecodingError as error:
-    print(f"Content decoding error: {error}")
-    
-except StreamConsumedError as error:
-    print(f"Stream consumed error: {error}")
-    
-except RetryError as error:
-    print(f"Retry error: {error}")
-    
-except RequestError as error:
-    print(f"Request error: {error}")
-    
-except CrawlPyError as error:
-    print(f"CrawlPy error: {error}")
+except Timeout as error:
+    print(f"Connection timeout: {error}")
 ```
-
-### Error Types
-
-| Exception | Description | Example |
-|-----------|-------------|---------|
-| `CrawlPyError` | Base exception class | All CrawlPy errors inherit from this |
-| `ConnectionError` | Connection failed | Network unreachable, DNS resolution failed |
-| `ConnectTimeout` | Connection timeout | Server took too long to establish connection |
-| `ReadTimeout` | Read timeout | Server took too long to send response |
-| `HTTPError` | HTTP error status | 404 Not Found, 500 Internal Server Error |
-| `RequestError` | General request error | Invalid request format |
-| `InvalidURL` | Invalid URL format | Malformed URL string |
-| `TooManyRedirects` | Too many redirects | Redirect loop detected |
-| `SSLError` | SSL/TLS error | Certificate verification failed |
-| `ProxyError` | Proxy server error | Proxy authentication failed |
-| `JSONDecodeError` | JSON parsing error | Invalid JSON response |
-| `ChunkedEncodingError` | Chunked encoding error | Invalid chunked response |
-| `ContentDecodingError` | Content decoding error | Invalid gzip/deflate encoding |
-| `StreamConsumedError` | Stream already consumed | Response body already read |
-| `RetryError` | Retry attempts exhausted | Max retries exceeded |
