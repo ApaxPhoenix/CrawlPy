@@ -33,15 +33,15 @@ print(f"Status: {response.status}")
 print(f"JSON: {response.json()}")
 
 # Execute multiple requests concurrently
-urls = [
+targets = [
     'https://httpbin.org/get',
     'https://httpbin.org/ip',
-    'https://httpbin.org/user-agent'
+    'https://httpbin.org/agent'
 ]
-results = await crawlpy.get(urls)
+results = await crawlpy.get(targets)
 
-for r in results:
-    print(f"Status: {r.status}, URL: {r.url}")
+for result in results:
+    print(f"Status: {result.status}, URL: {result.url}")
 ```
 
 ## HTTP Methods
@@ -59,30 +59,30 @@ params = {'page': 1, 'limit': 10}
 response = await crawlpy.get('https://httpbin.org/get', params=params)
 
 # Send GET request with custom headers
-headers = {'User-Agent': 'MyApp/1.0'}
+headers = {'Agent': 'MyApp/1.0'}
 response = await crawlpy.get('https://httpbin.org/get', headers=headers)
 
 # Execute multiple GET requests simultaneously
 urls = ['https://httpbin.org/get', 'https://httpbin.org/ip']
-results = await crawlpy.get(urls)
+responses = await crawlpy.get(urls)
 ```
 
 ### POST Requests
 
-CrawlPy automatically sets appropriate Content-Type headers based on the data format provided.
+CrawlPy automatically sets appropriate headers based on the data format provided.
 
 ```python
 # Send POST request with JSON payload
-data = {'name': 'John', 'email': 'john@example.com'}
-response = await crawlpy.post('https://httpbin.org/post', json=data)
+payload = {'name': 'John', 'email': 'john@example.com'}
+response = await crawlpy.post('https://httpbin.org/post', json=payload)
 
 # Submit form data via POST request
-form = {'username': 'john', 'password': 'secret'}
-response = await crawlpy.post('https://httpbin.org/post', data=form)
+data = {'username': 'john', 'password': 'secret'}
+response = await crawlpy.post('https://httpbin.org/post', data=data)
 
 # Upload file through POST request
-with open('file.pdf', 'rb') as file:
-    files = {'document': file}
+with open('file.pdf', 'rb') as f:
+    files = {'document': f}
     response = await crawlpy.post('https://httpbin.org/post', files=files)
 ```
 
@@ -90,20 +90,20 @@ with open('file.pdf', 'rb') as file:
 
 ```python
 # Prepare data payload for various operations
-data = {'status': 'updated'}
+payload = {'status': 'updated'}
 
 # Send PUT request to replace entire resource
-resp = await crawlpy.put('https://httpbin.org/put', json=data)
+response = await crawlpy.put('https://httpbin.org/put', json=payload)
 
 # Send DELETE request to remove resource
-resp = await crawlpy.delete('https://httpbin.org/delete')
+response = await crawlpy.delete('https://httpbin.org/delete')
 
 # Send PATCH request for partial resource modification
-patch = {'status': 'partial'}
-resp = await crawlpy.patch('https://httpbin.org/patch', json=patch)
+update = {'status': 'partial'}
+response = await crawlpy.patch('https://httpbin.org/patch', json=update)
 
 # Send HEAD request to retrieve headers only
-resp = await crawlpy.head('https://httpbin.org/get')
+response = await crawlpy.head('https://httpbin.org/get')
 ```
 
 ## Response Objects
@@ -115,25 +115,25 @@ Response objects provide comprehensive access to HTTP response data with automat
 response = await crawlpy.get('https://httpbin.org/json')
 
 # Access response metadata
-status = response.status        # HTTP status code
+code = response.status          # HTTP status code
 headers = response.headers      # Response headers dictionary
-url = response.url             # Final URL after redirects
+location = response.url         # Final URL after redirects
 
 # Extract response content in different formats
 text = response.text           # Response body as string
 content = response.content     # Response body as bytes
-data = response.json()         # Parsed JSON response
+parsed = response.json()       # Parsed JSON response
 
 # Retrieve performance and encoding information
-elapsed = response.elapsed     # Request duration in seconds
-encoding = response.encoding   # Character encoding
+duration = response.elapsed    # Request duration in seconds
+charset = response.encoding    # Character encoding
 
 # Handle response errors
 try:
-    response.raise_for_status()  # Raises exception for 4xx/5xx status codes
-    print(f"Success: {status}")
-except crawlpy.HTTPError as error:
-    print(f"Error: {error}")
+    response.check()  # Raises exception for 4xx/5xx status codes
+    print(f"Success: {code}")
+except crawlpy.HTTPError as err:
+    print(f"Error: {err}")
 ```
 
 ## Request Preparation
@@ -142,30 +142,30 @@ The request preparation system enables request building and modification before 
 
 ```python
 # Build GET request without executing
-requests = crawlpy.prepare('GET', 'https://httpbin.org/get')
-print(f"Method: {requests.method}")
-print(f"URL: {requests.url}")
-print(f"Headers: {requests.headers}")
+request = crawlpy.prepare('GET', 'https://httpbin.org/get')
+print(f"Method: {request.method}")
+print(f"URL: {request.url}")
+print(f"Headers: {request.headers}")
 
 # Construct POST request with JSON data
-data = {'user': 'john', 'pass': 'secret'}
-requests = crawlpy.prepare('POST', 'https://httpbin.org/post', json=data)
-print(f"Body: {requests.body}")
+payload = {'user': 'john', 'pass': 'secret'}
+request = crawlpy.prepare('POST', 'https://httpbin.org/post', json=payload)
+print(f"Body: {request.body}")
 
 # Build request with custom headers and parameters
 headers = {'Auth': 'Bearer token123'}
 params = {'limit': 10, 'page': 1}
-requests = crawlpy.prepare('GET', 'https://api.com/data', 
-                     headers=headers, params=params)
+request = crawlpy.prepare('GET', 'https://api.com/data', 
+                         headers=headers, params=params)
 
 # Execute prepared request
-response = await crawlpy.send(requests)
+response = await crawlpy.send(request)
 print(f"Status: {response.status}")
 
 # Modify prepared request before execution
-requests.headers['User-Agent'] = 'CrawlPy/1.0'
-requests.url = 'https://httpbin.org/headers'
-response = await crawlpy.send(requests)
+request.headers['Agent'] = 'CrawlPy/1.0'
+request.url = 'https://httpbin.org/headers'
+response = await crawlpy.send(request)
 ```
 
 ## Sessions
@@ -176,26 +176,137 @@ Sessions maintain cookies and connection pools across requests.
 from crawlpy import Session
 
 # Create session
-async with Session() as session:
+async with Session() as client:
     # Set default headers
-    session.headers.update({'User-Agent': 'CrawlPy/2.0'})
+    client.headers.update({'Agent': 'CrawlPy/2.0'})
     
     # Make request with session
-    response = await session.get('https://httpbin.org/get')
+    response = await client.get('https://httpbin.org/get')
     
     # Set base URL
-    session.base = 'https://api.example.com/v1'
-    profile = await session.get('/user/123')
+    client.base = 'https://api.example.com/v1'
+    profile = await client.get('/user/123')
 
 # Manual session management
-session = Session(timeout=30.0)
-response = await session.get('https://httpbin.org/get')
-await session.close()
+client = Session(timeout=30.0)
+response = await client.get('https://httpbin.org/get')
+await client.close()
+```
+
+## Retry Mechanisms
+
+CrawlPy provides automatic retry functionality with the `Retry` class for handling transient failures and unstable connections.
+
+```python
+from crawlpy import Retry
+
+# Configure basic retry behavior
+policy = Retry(
+    attempts=3,
+    factor=1.0,
+    codes=[429, 500, 502, 503, 504]
+)
+
+# Use retry configuration with requests
+response = await crawlpy.get(
+    'https://httpbin.org/status/503',
+    retry=policy
+)
+
+# Advanced retry configuration
+policy = Retry(
+    attempts=5,
+    factor=2.0,        # Exponential backoff: 2, 4, 8, 16 seconds
+    ceiling=60.0,      # Maximum backoff time
+    timeout=True,      # Retry on timeout errors
+    connect=True,      # Retry on connection errors
+    codes=[429, 500, 502, 503, 504]
+)
+
+response = await crawlpy.get(
+    'https://api.example.com/endpoint',
+    retry=policy
+)
+
+# Session-level retry configuration
+from crawlpy import Session
+
+async with Session(retry=policy) as client:
+    response = await client.get('https://api.example.com/data')
+```
+
+## Rate Limiting
+
+CrawlPy provides intelligent rate limiting with the `Limit` class to control request frequency and avoid overwhelming servers or hitting API limits.
+
+```python
+from crawlpy import Limit
+
+# Configure basic rate limiting
+throttle = Limit(
+    calls=10,      # Maximum 10 requests
+    window=60      # Per 60 seconds
+)
+
+# Use rate limiter with requests
+response = await crawlpy.get(
+    'https://api.example.com/data',
+    limiter=throttle
+)
+
+# Advanced rate limiting configuration
+throttle = Limit(
+    calls=100,         # 100 requests maximum
+    window=3600,       # Per hour (3600 seconds)
+    burst=10,          # Allow bursts of 10 requests
+    delay=0.5,         # Minimum 0.5 seconds between requests
+    backoff=True,      # Enable exponential backoff on limit hit
+    factor=2.0         # Backoff multiplier
+)
+
+response = await crawlpy.get(
+    'https://api.example.com/endpoint',
+    limiter=throttle
+)
+
+# Session-level rate limiting
+from crawlpy import Session
+
+async with Session(limiter=throttle) as client:
+    # All requests through this session will be rate limited
+    for i in range(50):
+        response = await client.get(f'https://api.example.com/item/{i}')
+        print(f"Item {i}: {response.status}")
+
+# Multiple rate limiters for different endpoints
+fast = Limit(calls=1000, window=3600)    # API limit
+slow = Limit(calls=1, window=2)          # Gentle scraping
+
+# Use different limiters for different requests
+api_response = await crawlpy.get('https://api.com/data', limiter=fast)
+page_response = await crawlpy.get('https://site.com/page', limiter=slow)
+
+# Rate limiter with custom timing
+throttle = Limit(
+    calls=5,           # 5 requests
+    window=10,         # Every 10 seconds
+    spread=True,       # Spread requests evenly across window
+    jitter=0.1         # Add random 0-0.1 second jitter
+)
+
+# Batch requests with rate limiting
+urls = [f'https://api.example.com/item/{i}' for i in range(100)]
+responses = await crawlpy.get(urls, limiter=throttle)
+
+# Check rate limiter status
+print(f"Remaining calls: {throttle.remaining}")
+print(f"Reset time: {throttle.reset}")
+print(f"Current window: {throttle.current}")
 ```
 
 ## Proxy Support
 
-CrawlPy provides comprehensive proxy support for anonymous browsing, geo-location spoofing, and load distribution.
+CrawlPy provides comprehensive proxy support for anonymous browsing, location spoofing, and load distribution.
 
 ```python
 # Configure single proxy for request
@@ -205,18 +316,18 @@ response = await crawlpy.get(
 )
 
 # Use authenticated proxy
-auth = 'http://user:pass@proxy.example.com:8080'
-response = await crawlpy.get('https://httpbin.org/ip', proxy=auth)
+endpoint = 'http://user:pass@proxy.example.com:8080'
+response = await crawlpy.get('https://httpbin.org/ip', proxy=endpoint)
 
 # Configure proxy pool for automatic rotation
-pool = [
+proxies = [
     'http://proxy1.example.com:8080',
     'http://proxy2.example.com:8080',
     'http://proxy3.example.com:8080'
 ]
 
 # Execute request with automatic proxy rotation
-response = await crawlpy.get('https://httpbin.org/ip', proxies=pool)
+response = await crawlpy.get('https://httpbin.org/ip', pool=proxies)
 print(f"Response: {response.json()}")
 ```
 
@@ -226,20 +337,29 @@ CrawlPy provides specific exception types for different error conditions, enabli
 
 ```python
 import crawlpy
-from crawlpy import HTTPError, Timeout, ConnectionError
+from crawlpy import HTTPError, Timeout, ConnectionError, Retry, Limited
 
 try:
     # Execute request with timeout specification
     response = await crawlpy.get('https://httpbin.org/status/404', timeout=10.0)
     # Validate status code for success (200-299)
-    response.raise_for_status()
+    response.check()
     return response.json()
     
 except HTTPError as error:
     # Handle HTTP errors (4xx client errors, 5xx server errors)
-    status = error.response.status
-    url = error.response.url
-    print(f"HTTP Error {status} for URL: {url}")
+    code = error.response.status
+    location = error.response.url
+    print(f"HTTP Error {code} for URL: {location}")
+    
+except Limited as error:
+    # Handle rate limit exceeded
+    delay = error.wait
+    print(f"Rate limited. Wait {delay} seconds before retry")
+    
+except Retry as error:
+    # Handle retry exhaustion
+    print(f"Request failed after {error.attempts} attempts: {error}")
     
 except Timeout as error:
     # Handle request timeout errors
