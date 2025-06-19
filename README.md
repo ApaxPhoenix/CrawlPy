@@ -16,7 +16,6 @@ CrawlPy provides several key components for comprehensive HTTP client functional
 - **Async HTTP Methods**: Full async/await support for GET, POST, PUT, DELETE, PATCH, and HEAD requests
 - **Response Objects**: Rich response handling with automatic content parsing and error detection
 - **Session Management**: Persistent connections with cookie handling and connection pooling
-- **Raw Connections**: Low-level TCP/SSL connection control for custom protocols
 - **Schema Structures**: CSS selector-based data extraction utilities
 - **Proxy Support**: Single proxy and proxy pool rotation capabilities
 
@@ -29,9 +28,9 @@ import asyncio
 import crawlpy
 
 # Execute single HTTP GET request
-resp = await crawlpy.get('https://httpbin.org/get')
-print(f"Status: {resp.status}")
-print(f"JSON: {resp.json()}")
+persons = await crawlpy.get('https://httpbin.org/get')
+print(f"Status: {persons.status}")
+print(f"JSON: {persons.json()}")
 
 # Execute multiple requests concurrently
 urls = [
@@ -53,15 +52,15 @@ CrawlPy supports all standard HTTP methods with consistent async interfaces and 
 
 ```python
 # Execute basic GET request
-resp = await crawlpy.get('https://httpbin.org/get')
+persons = await crawlpy.get('https://httpbin.org/get')
 
 # Send GET request with query parameters
 params = {'page': 1, 'limit': 10}
-resp = await crawlpy.get('https://httpbin.org/get', params=params)
+persons = await crawlpy.get('https://httpbin.org/get', params=params)
 
 # Send GET request with custom headers
 headers = {'User-Agent': 'MyApp/1.0'}
-resp = await crawlpy.get('https://httpbin.org/get', headers=headers)
+persons = await crawlpy.get('https://httpbin.org/get', headers=headers)
 
 # Execute multiple GET requests simultaneously
 urls = ['https://httpbin.org/get', 'https://httpbin.org/ip']
@@ -75,16 +74,16 @@ CrawlPy automatically sets appropriate Content-Type headers based on the data fo
 ```python
 # Send POST request with JSON payload
 data = {'name': 'John', 'email': 'john@example.com'}
-resp = await crawlpy.post('https://httpbin.org/post', json=data)
+persons = await crawlpy.post('https://httpbin.org/post', json=data)
 
 # Submit form data via POST request
 form = {'username': 'john', 'password': 'secret'}
-resp = await crawlpy.post('https://httpbin.org/post', data=form)
+persons = await crawlpy.post('https://httpbin.org/post', data=form)
 
 # Upload file through POST request
 with open('file.pdf', 'rb') as file:
     files = {'document': file}
-    resp = await crawlpy.post('https://httpbin.org/post', files=files)
+    persons = await crawlpy.post('https://httpbin.org/post', files=files)
 ```
 
 ### Other Methods
@@ -113,25 +112,25 @@ Response objects provide comprehensive access to HTTP response data with automat
 
 ```python
 # Retrieve response from API endpoint
-resp = await crawlpy.get('https://httpbin.org/json')
+persons = await crawlpy.get('https://httpbin.org/json')
 
 # Access response metadata
-status = resp.status        # HTTP status code
-headers = resp.headers      # Response headers dictionary
-url = resp.url             # Final URL after redirects
+status = persons.status        # HTTP status code
+headers = persons.headers      # Response headers dictionary
+url = persons.url             # Final URL after redirects
 
 # Extract response content in different formats
-text = resp.text           # Response body as string
-content = resp.content     # Response body as bytes
-data = resp.json()         # Parsed JSON response
+text = persons.text           # Response body as string
+content = persons.content     # Response body as bytes
+data = persons.json()         # Parsed JSON response
 
 # Retrieve performance and encoding information
-elapsed = resp.elapsed     # Request duration in seconds
-encoding = resp.encoding   # Character encoding
+elapsed = persons.elapsed     # Request duration in seconds
+encoding = persons.encoding   # Character encoding
 
 # Handle response errors
 try:
-    resp.raise_for_status()  # Raises exception for 4xx/5xx status codes
+    persons.raise_for_status()  # Raises exception for 4xx/5xx status codes
     print(f"Success: {status}")
 except crawlpy.HTTPError as error:
     print(f"Error: {error}")
@@ -143,67 +142,30 @@ The request preparation system enables request building and modification before 
 
 ```python
 # Build GET request without executing
-req = crawlpy.prepare('GET', 'https://httpbin.org/get')
-print(f"Method: {req.method}")
-print(f"URL: {req.url}")
-print(f"Headers: {req.headers}")
+response = crawlpy.prepare('GET', 'https://httpbin.org/get')
+print(f"Method: {response.method}")
+print(f"URL: {response.url}")
+print(f"Headers: {response.headers}")
 
 # Construct POST request with JSON data
 data = {'user': 'john', 'pass': 'secret'}
-req = crawlpy.prepare('POST', 'https://httpbin.org/post', json=data)
-print(f"Body: {req.body}")
+response = crawlpy.prepare('POST', 'https://httpbin.org/post', json=data)
+print(f"Body: {response.body}")
 
 # Build request with custom headers and parameters
 headers = {'Auth': 'Bearer token123'}
 params = {'limit': 10, 'page': 1}
-req = crawlpy.prepare('GET', 'https://api.com/data', 
+response = crawlpy.prepare('GET', 'https://api.com/data', 
                      headers=headers, params=params)
 
 # Execute prepared request
-resp = await crawlpy.send(req)
-print(f"Status: {resp.status}")
+persons = await crawlpy.send(response)
+print(f"Status: {persons.status}")
 
 # Modify prepared request before execution
-req.headers['User-Agent'] = 'CrawlPy/1.0'
-req.url = 'https://httpbin.org/headers'
-resp = await crawlpy.send(req)
-```
-
-## Connections
-
-Direct TCP/SSL connections for custom protocols and streaming data.
-
-### Basic Connection
-
-```python
-# Connect to server
-connection = await crawlpy.connection('httpbin.org', 443, ssl=True)
-
-# Send HTTP request
-await connection.write(b'GET /get HTTP/1.1\r\n')
-await connection.write(b'Host: httpbin.org\r\n\r\n')
-
-# Read response
-data = await connection.read()
-print(f"Response: {data.decode()[:200]}...")
-
-await connection.close()
-```
-
-### Streaming
-
-```python
-# Stream large responses
-connection = await crawlpy.connection('httpbin.org', 443, ssl=True)
-await connection.write(b'GET /stream/10 HTTP/1.1\r\nHost: httpbin.org\r\n\r\n')
-
-while True:
-    chunk = await connection.read(1024)
-    if not chunk:
-        break
-    print(f"Chunk: {len(chunk)} bytes")
-
-await connection.close()
+response.headers['User-Agent'] = 'CrawlPy/1.0'
+response.url = 'https://httpbin.org/headers'
+persons = await crawlpy.send(response)
 ```
 
 ## Sessions
@@ -219,7 +181,7 @@ async with Session() as session:
     session.headers.update({'User-Agent': 'CrawlPy/2.0'})
     
     # Make request with session
-    resp = await session.get('https://httpbin.org/get')
+    persons = await session.get('https://httpbin.org/get')
     
     # Set base URL
     session.base = 'https://api.example.com/v1'
@@ -227,7 +189,7 @@ async with Session() as session:
 
 # Manual session management
 session = Session(timeout=30.0)
-resp = await session.get('https://httpbin.org/get')
+persons = await session.get('https://httpbin.org/get')
 await session.close()
 ```
 
@@ -237,14 +199,14 @@ CrawlPy provides comprehensive proxy support for anonymous browsing, geo-locatio
 
 ```python
 # Configure single proxy for request
-resp = await crawlpy.get(
+persons = await crawlpy.get(
     'https://httpbin.org/ip',
     proxy='http://proxy.example.com:8080'
 )
 
 # Use authenticated proxy
 auth = 'http://user:pass@proxy.example.com:8080'
-resp = await crawlpy.get('https://httpbin.org/ip', proxy=auth)
+persons = await crawlpy.get('https://httpbin.org/ip', proxy=auth)
 
 # Configure proxy pool for automatic rotation
 pool = [
@@ -254,15 +216,8 @@ pool = [
 ]
 
 # Execute request with automatic proxy rotation
-resp = await crawlpy.get('https://httpbin.org/ip', proxies=pool)
-print(f"Response: {resp.json()}")
-
-# Establish connection through proxy
-connection = await crawlpy.connection('httpbin.org', 443, ssl=True, 
-                                    proxy='http://proxy.com:8080')
-await connection.write(b'GET /ip HTTP/1.1\r\nHost: httpbin.org\r\n\r\n')
-data = await connection.read()
-await connection.close()
+persons = await crawlpy.get('https://httpbin.org/ip', proxies=pool)
+print(f"Response: {persons.json()}")
 ```
 
 ## Error Handling
@@ -275,10 +230,10 @@ from crawlpy import HTTPError, Timeout, ConnectionError
 
 try:
     # Execute request with timeout specification
-    resp = await crawlpy.get('https://httpbin.org/status/404', timeout=10.0)
+    persons = await crawlpy.get('https://httpbin.org/status/404', timeout=10.0)
     # Validate status code for success (200-299)
-    resp.raise_for_status()
-    return resp.json()
+    persons.raise_for_status()
+    return persons.json()
     
 except HTTPError as error:
     # Handle HTTP errors (4xx client errors, 5xx server errors)
@@ -297,19 +252,4 @@ except ConnectionError as error:
 except Exception as error:
     # Handle unexpected errors
     print(f"Error: {error}")
-
-# Handle raw connection errors
-try:
-    connection = await crawlpy.connection('invalid.host', 443, ssl=True)
-    await connection.write(b'GET / HTTP/1.1\r\n\r\n')
-    data = await connection.read()
-    
-except ConnectionError as error:
-    print(f"Connection failed: {error}")
-    
-except crawlpy.SSLError as error:
-    print(f"SSL error: {error}")
-    
-except Timeout as error:
-    print(f"Connection timeout: {error}")
 ```
