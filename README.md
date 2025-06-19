@@ -30,7 +30,7 @@ import crawlpy
 # Execute single HTTP GET request
 response = await crawlpy.get('https://httpbin.org/get')
 print(f"Status: {response.status}")
-print(f"JSON: {response.json()}")
+print(f"JSON: {response.parse()}")
 
 # Execute multiple requests concurrently
 targets = [
@@ -122,18 +122,18 @@ location = response.url         # Final URL after redirects
 # Extract response content in different formats
 text = response.text           # Response body as string
 content = response.content     # Response body as bytes
-parsed = response.json()       # Parsed JSON response
+data = response.parse()        # Parsed JSON response
 
 # Retrieve performance and encoding information
 duration = response.elapsed    # Request duration in seconds
-charset = response.encoding    # Character encoding
+encoding = response.encoding   # Character encoding
 
 # Handle response errors
 try:
-    response.check()  # Raises exception for 4xx/5xx status codes
+    response.validate()  # Raises exception for 4xx/5xx status codes
     print(f"Success: {code}")
-except crawlpy.HTTPError as err:
-    print(f"Error: {err}")
+except crawlpy.HTTPError as error:
+    print(f"Error: {error}")
 ```
 
 ## Request Preparation
@@ -142,30 +142,30 @@ The request preparation system enables request building and modification before 
 
 ```python
 # Build GET request without executing
-request = crawlpy.prepare('GET', 'https://httpbin.org/get')
+request = crawlpy.build('GET', 'https://httpbin.org/get')
 print(f"Method: {request.method}")
 print(f"URL: {request.url}")
 print(f"Headers: {request.headers}")
 
 # Construct POST request with JSON data
 payload = {'user': 'john', 'pass': 'secret'}
-request = crawlpy.prepare('POST', 'https://httpbin.org/post', json=payload)
+request = crawlpy.build('POST', 'https://httpbin.org/post', json=payload)
 print(f"Body: {request.body}")
 
 # Build request with custom headers and parameters
 headers = {'Auth': 'Bearer token123'}
 params = {'limit': 10, 'page': 1}
-request = crawlpy.prepare('GET', 'https://api.com/data', 
-                         headers=headers, params=params)
+request = crawlpy.build('GET', 'https://api.com/data', 
+                        headers=headers, params=params)
 
 # Execute prepared request
-response = await crawlpy.send(request)
+response = await crawlpy.execute(request)
 print(f"Status: {response.status}")
 
 # Modify prepared request before execution
 request.headers['Agent'] = 'CrawlPy/1.0'
 request.url = 'https://httpbin.org/headers'
-response = await crawlpy.send(request)
+response = await crawlpy.execute(request)
 ```
 
 ## Sessions
@@ -190,7 +190,7 @@ async with Session() as client:
 # Manual session management
 client = Session(timeout=30.0)
 response = await client.get('https://httpbin.org/get')
-await client.close()
+await client.terminate()
 
 # Session with custom configuration
 async with Session(
@@ -210,9 +210,9 @@ from crawlpy import Retry
 
 # Configure basic retry behavior
 policy = Retry(
-    attempts=3,
-    factor=1.0,
-    codes=[429, 500, 502, 503, 504]
+    retries=3,
+    multiplier=1.0,
+    statuses=[429, 500, 502, 503, 504]
 )
 
 # Use retry configuration with requests
@@ -223,12 +223,12 @@ response = await crawlpy.get(
 
 # Advanced retry configuration
 policy = Retry(
-    attempts=5,
-    factor=2.0,        # Exponential backoff: 2, 4, 8, 16 seconds
-    ceiling=60.0,      # Maximum backoff time
-    timeout=True,      # Retry on timeout errors
-    connect=True,      # Retry on connection errors
-    codes=[429, 500, 502, 503, 504]
+    retries=5,
+    multiplier=2.0,       # Exponential backoff: 2, 4, 8, 16 seconds
+    maximum=60.0,         # Maximum backoff time
+    timeout=True,         # Retry on timeout errors
+    connect=True,         # Retry on connection errors
+    statuses=[429, 500, 502, 503, 504]
 )
 
 response = await crawlpy.get(
@@ -238,11 +238,11 @@ response = await crawlpy.get(
 
 # Retry with custom conditions
 policy = Retry(
-    attempts=3,
-    factor=1.5,
-    codes=[429, 500, 502, 503, 504],
-    backoff_jitter=True,    # Add randomization to backoff
-    max_backoff=30.0        # Cap backoff at 30 seconds
+    retries=3,
+    multiplier=1.5,
+    statuses=[429, 500, 502, 503, 504],
+    randomization=True,    # Add randomization to backoff
+    limit=30.0             # Cap backoff at 30 seconds
 )
 
 response = await crawlpy.get(
@@ -260,8 +260,8 @@ from crawlpy import Limit
 
 # Configure basic rate limiting
 throttle = Limit(
-    calls=10,      # Maximum 10 requests
-    period=60      # Per 60 seconds
+    requests=10,   # Maximum 10 requests
+    window=60      # Per 60 seconds
 )
 
 # Use rate limiter with requests
@@ -272,12 +272,12 @@ response = await crawlpy.get(
 
 # Advanced rate limiting configuration
 throttle = Limit(
-    calls=100,         # 100 requests maximum
-    period=3600,       # Per hour (3600 seconds)
-    burst=10,          # Allow bursts of 10 requests
+    requests=100,      # 100 requests maximum
+    window=3600,       # Per hour (3600 seconds)
+    batch=10,          # Allow bursts of 10 requests
     delay=0.5,         # Minimum 0.5 seconds between requests
     backoff=True,      # Enable exponential backoff on limit hit
-    factor=2.0         # Backoff multiplier
+    multiplier=2.0     # Backoff multiplier
 )
 
 response = await crawlpy.get(
@@ -286,19 +286,19 @@ response = await crawlpy.get(
 )
 
 # Multiple rate limiters for different endpoints
-fast_limiter = Limit(calls=1000, period=3600)    # API limit
-slow_limiter = Limit(calls=1, period=2)          # Gentle scraping
+fast = Limit(requests=1000, window=3600)    # API limit
+slow = Limit(requests=1, window=2)          # Gentle scraping
 
 # Use different limiters for different requests
-api_response = await crawlpy.get('https://api.com/data', limiter=fast_limiter)
-page_response = await crawlpy.get('https://site.com/page', limiter=slow_limiter)
+api = await crawlpy.get('https://api.com/data', limiter=fast)
+page = await crawlpy.get('https://site.com/page', limiter=slow)
 
 # Rate limiter with custom timing
 throttle = Limit(
-    calls=5,           # 5 requests
-    period=10,         # Every 10 seconds
-    spread=True,       # Spread requests evenly across period
-    jitter=0.1         # Add random 0-0.1 second jitter
+    requests=5,        # 5 requests
+    window=10,         # Every 10 seconds
+    distribute=True,   # Spread requests evenly across window
+    variance=0.1       # Add random 0-0.1 second variance
 )
 
 # Batch requests with rate limiting
@@ -306,9 +306,9 @@ urls = [f'https://api.example.com/item/{i}' for i in range(100)]
 responses = await crawlpy.get(urls, limiter=throttle)
 
 # Check rate limiter status
-print(f"Remaining calls: {throttle.remaining}")
+print(f"Remaining requests: {throttle.remaining}")
 print(f"Reset time: {throttle.reset}")
-print(f"Current period: {throttle.current}")
+print(f"Current window: {throttle.current}")
 ```
 
 ## Proxy Support
@@ -335,14 +335,14 @@ proxies = [
 
 # Execute request with automatic proxy rotation
 response = await crawlpy.get('https://httpbin.org/ip', pool=proxies)
-print(f"Response: {response.json()}")
+print(f"Response: {response.parse()}")
 
 # Advanced proxy configuration
-proxy_config = {
+configuration = {
     'http': 'http://proxy.example.com:8080',
     'https': 'https://secure-proxy.example.com:8443'
 }
-response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy_config)
+response = await crawlpy.get('https://httpbin.org/ip', proxy=configuration)
 
 # Proxy with custom authentication
 import base64
@@ -355,44 +355,7 @@ response = await crawlpy.get(
 )
 ```
 
-## Combining Features
 
-CrawlPy allows combining multiple features for robust HTTP client functionality.
-
-```python
-from crawlpy import Session, Retry, Limit
-
-# Create comprehensive client configuration
-retry_policy = Retry(attempts=3, factor=2.0, codes=[429, 500, 502, 503])
-rate_limiter = Limit(calls=100, period=3600, burst=10)
-
-# Use session with retry and rate limiting
-async with Session(
-    timeout=30.0,
-    retry=retry_policy,
-    limiter=rate_limiter,
-    headers={'User-Agent': 'CrawlPy/2.0'}
-) as client:
-    
-    # All requests will use configured retry and rate limiting
-    response = await client.get('https://api.example.com/data')
-    
-    # Override session configuration for specific request
-    special_limiter = Limit(calls=1, period=5)
-    response = await client.get(
-        'https://api.example.com/special',
-        limiter=special_limiter
-    )
-
-# Individual request with multiple features
-response = await crawlpy.get(
-    'https://api.example.com/endpoint',
-    retry=retry_policy,
-    limiter=rate_limiter,
-    proxy='http://proxy.example.com:8080',
-    timeout=60.0
-)
-```
 
 ## Error Handling
 
@@ -406,8 +369,8 @@ try:
     # Execute request with timeout specification
     response = await crawlpy.get('https://httpbin.org/status/404', timeout=10.0)
     # Validate status code for success (200-299)
-    response.check()
-    return response.json()
+    response.validate()
+    return response.parse()
     
 except HTTPError as error:
     # Handle HTTP errors (4xx client errors, 5xx server errors)
@@ -422,7 +385,7 @@ except Limited as error:
     
 except Retry as error:
     # Handle retry exhaustion
-    print(f"Request failed after {error.attempts} attempts: {error}")
+    print(f"Request failed after {error.retries} retries: {error}")
     
 except Timeout as error:
     # Handle request timeout errors
