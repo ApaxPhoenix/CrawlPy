@@ -175,7 +175,7 @@ Sessions maintain cookies and connection pools across requests.
 ```python
 from crawlpy import Session
 
-# Create session
+# Create session with context manager
 async with Session() as client:
     # Set default headers
     client.headers.update({'Agent': 'CrawlPy/2.0'})
@@ -183,7 +183,7 @@ async with Session() as client:
     # Make request with session
     response = await client.get('https://httpbin.org/get')
     
-    # Set base URL
+    # Set base URL for relative requests
     client.base = 'https://api.example.com/v1'
     profile = await client.get('/user/123')
 
@@ -191,6 +191,14 @@ async with Session() as client:
 client = Session(timeout=30.0)
 response = await client.get('https://httpbin.org/get')
 await client.close()
+
+# Session with custom configuration
+async with Session(
+    timeout=60.0,
+    headers={'User-Agent': 'MyApp/1.0'},
+    cookies={'session': 'abc123'}
+) as client:
+    response = await client.get('https://api.example.com/data')
 ```
 
 ## Retry Mechanisms
@@ -228,11 +236,19 @@ response = await crawlpy.get(
     retry=policy
 )
 
-# Session-level retry configuration
-from crawlpy import Session
+# Retry with custom conditions
+policy = Retry(
+    attempts=3,
+    factor=1.5,
+    codes=[429, 500, 502, 503, 504],
+    backoff_jitter=True,    # Add randomization to backoff
+    max_backoff=30.0        # Cap backoff at 30 seconds
+)
 
-async with Session(retry=policy) as client:
-    response = await client.get('https://api.example.com/data')
+response = await crawlpy.get(
+    'https://unstable-api.example.com/data',
+    retry=policy
+)
 ```
 
 ## Rate Limiting
@@ -245,7 +261,7 @@ from crawlpy import Limit
 # Configure basic rate limiting
 throttle = Limit(
     calls=10,      # Maximum 10 requests
-    window=60      # Per 60 seconds
+    period=60      # Per 60 seconds
 )
 
 # Use rate limiter with requests
@@ -257,7 +273,7 @@ response = await crawlpy.get(
 # Advanced rate limiting configuration
 throttle = Limit(
     calls=100,         # 100 requests maximum
-    window=3600,       # Per hour (3600 seconds)
+    period=3600,       # Per hour (3600 seconds)
     burst=10,          # Allow bursts of 10 requests
     delay=0.5,         # Minimum 0.5 seconds between requests
     backoff=True,      # Enable exponential backoff on limit hit
@@ -269,28 +285,19 @@ response = await crawlpy.get(
     limiter=throttle
 )
 
-# Session-level rate limiting
-from crawlpy import Session
-
-async with Session(limiter=throttle) as client:
-    # All requests through this session will be rate limited
-    for i in range(50):
-        response = await client.get(f'https://api.example.com/item/{i}')
-        print(f"Item {i}: {response.status}")
-
 # Multiple rate limiters for different endpoints
-fast = Limit(calls=1000, window=3600)    # API limit
-slow = Limit(calls=1, window=2)          # Gentle scraping
+fast_limiter = Limit(calls=1000, period=3600)    # API limit
+slow_limiter = Limit(calls=1, period=2)          # Gentle scraping
 
 # Use different limiters for different requests
-api_response = await crawlpy.get('https://api.com/data', limiter=fast)
-page_response = await crawlpy.get('https://site.com/page', limiter=slow)
+api_response = await crawlpy.get('https://api.com/data', limiter=fast_limiter)
+page_response = await crawlpy.get('https://site.com/page', limiter=slow_limiter)
 
 # Rate limiter with custom timing
 throttle = Limit(
     calls=5,           # 5 requests
-    window=10,         # Every 10 seconds
-    spread=True,       # Spread requests evenly across window
+    period=10,         # Every 10 seconds
+    spread=True,       # Spread requests evenly across period
     jitter=0.1         # Add random 0-0.1 second jitter
 )
 
@@ -301,7 +308,7 @@ responses = await crawlpy.get(urls, limiter=throttle)
 # Check rate limiter status
 print(f"Remaining calls: {throttle.remaining}")
 print(f"Reset time: {throttle.reset}")
-print(f"Current window: {throttle.current}")
+print(f"Current period: {throttle.current}")
 ```
 
 ## Proxy Support
@@ -329,6 +336,62 @@ proxies = [
 # Execute request with automatic proxy rotation
 response = await crawlpy.get('https://httpbin.org/ip', pool=proxies)
 print(f"Response: {response.json()}")
+
+# Advanced proxy configuration
+proxy_config = {
+    'http': 'http://proxy.example.com:8080',
+    'https': 'https://secure-proxy.example.com:8443'
+}
+response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy_config)
+
+# Proxy with custom authentication
+import base64
+auth = base64.b64encode(b'username:password').decode('ascii')
+headers = {'Proxy-Authorization': f'Basic {auth}'}
+response = await crawlpy.get(
+    'https://httpbin.org/ip',
+    proxy='http://proxy.example.com:8080',
+    headers=headers
+)
+```
+
+## Combining Features
+
+CrawlPy allows combining multiple features for robust HTTP client functionality.
+
+```python
+from crawlpy import Session, Retry, Limit
+
+# Create comprehensive client configuration
+retry_policy = Retry(attempts=3, factor=2.0, codes=[429, 500, 502, 503])
+rate_limiter = Limit(calls=100, period=3600, burst=10)
+
+# Use session with retry and rate limiting
+async with Session(
+    timeout=30.0,
+    retry=retry_policy,
+    limiter=rate_limiter,
+    headers={'User-Agent': 'CrawlPy/2.0'}
+) as client:
+    
+    # All requests will use configured retry and rate limiting
+    response = await client.get('https://api.example.com/data')
+    
+    # Override session configuration for specific request
+    special_limiter = Limit(calls=1, period=5)
+    response = await client.get(
+        'https://api.example.com/special',
+        limiter=special_limiter
+    )
+
+# Individual request with multiple features
+response = await crawlpy.get(
+    'https://api.example.com/endpoint',
+    retry=retry_policy,
+    limiter=rate_limiter,
+    proxy='http://proxy.example.com:8080',
+    timeout=60.0
+)
 ```
 
 ## Error Handling
