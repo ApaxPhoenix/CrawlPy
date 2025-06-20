@@ -175,7 +175,7 @@ Sessions maintain cookies and connection pools across requests.
 ```python
 from crawlpy import Session
 
-# Create session with context manager
+# Basic session with context manager
 async with Session() as client:
     # Set default headers
     client.headers.update({'Agent': 'CrawlPy/2.0'})
@@ -186,11 +186,6 @@ async with Session() as client:
     # Set base URL for relative requests
     client.base = 'https://api.example.com/v1'
     profile = await client.get('/user/123')
-
-# Manual session management
-client = Session(timeout=30.0)
-response = await client.get('https://httpbin.org/get')
-await client.terminate()
 
 # Session with custom configuration
 async with Session(
@@ -208,46 +203,19 @@ CrawlPy provides automatic retry functionality with the `Retry` class for handli
 ```python
 from crawlpy import Retry
 
-# Configure basic retry behavior
-policy = Retry(
+# Configure retry with exponential backoff
+retry = Retry(
     retries=3,
-    multiplier=1.0,
-    statuses=[429, 500, 502, 503, 504]
+    multiplier=2.0,       # Exponential backoff: 2, 4, 8 seconds
+    statuses=[429, 500, 502, 503, 504],
+    timeout=True,         # Retry on timeout errors
+    connect=True          # Retry on connection errors
 )
 
 # Use retry configuration with requests
 response = await crawlpy.get(
-    'https://httpbin.org/status/503',
-    retry=policy
-)
-
-# Advanced retry configuration
-policy = Retry(
-    retries=5,
-    multiplier=2.0,       # Exponential backoff: 2, 4, 8, 16 seconds
-    maximum=60.0,         # Maximum backoff time
-    timeout=True,         # Retry on timeout errors
-    connect=True,         # Retry on connection errors
-    statuses=[429, 500, 502, 503, 504]
-)
-
-response = await crawlpy.get(
-    'https://api.example.com/endpoint',
-    retry=policy
-)
-
-# Retry with custom conditions
-policy = Retry(
-    retries=3,
-    multiplier=1.5,
-    statuses=[429, 500, 502, 503, 504],
-    randomization=True,    # Add randomization to backoff
-    limit=30.0             # Cap backoff at 30 seconds
-)
-
-response = await crawlpy.get(
     'https://unstable-api.example.com/data',
-    retry=policy
+    retry=retry
 )
 ```
 
@@ -258,57 +226,23 @@ CrawlPy provides intelligent rate limiting with the `Limit` class to control req
 ```python
 from crawlpy import Limit
 
-# Configure basic rate limiting
-throttle = Limit(
-    requests=10,   # Maximum 10 requests
-    window=60      # Per 60 seconds
+# Configure rate limiting with burst allowance
+limit = Limit(
+    requests=100,      # 100 requests maximum
+    window=3600,       # Per hour (3600 seconds)
+    batch=10,          # Allow bursts of 10 requests
+    delay=0.5          # Minimum 0.5 seconds between requests
 )
 
 # Use rate limiter with requests
 response = await crawlpy.get(
     'https://api.example.com/data',
-    limiter=throttle
+    limit=limit
 )
-
-# Advanced rate limiting configuration
-throttle = Limit(
-    requests=100,      # 100 requests maximum
-    window=3600,       # Per hour (3600 seconds)
-    batch=10,          # Allow bursts of 10 requests
-    delay=0.5,         # Minimum 0.5 seconds between requests
-    backoff=True,      # Enable exponential backoff on limit hit
-    multiplier=2.0     # Backoff multiplier
-)
-
-response = await crawlpy.get(
-    'https://api.example.com/endpoint',
-    limiter=throttle
-)
-
-# Multiple rate limiters for different endpoints
-fast = Limit(requests=1000, window=3600)    # API limit
-slow = Limit(requests=1, window=2)          # Gentle scraping
-
-# Use different limiters for different requests
-api = await crawlpy.get('https://api.com/data', limiter=fast)
-page = await crawlpy.get('https://site.com/page', limiter=slow)
-
-# Rate limiter with custom timing
-throttle = Limit(
-    requests=5,        # 5 requests
-    window=10,         # Every 10 seconds
-    distribute=True,   # Spread requests evenly across window
-    variance=0.1       # Add random 0-0.1 second variance
-)
-
-# Batch requests with rate limiting
-urls = [f'https://api.example.com/item/{i}' for i in range(100)]
-responses = await crawlpy.get(urls, limiter=throttle)
 
 # Check rate limiter status
-print(f"Remaining requests: {throttle.remaining}")
-print(f"Reset time: {throttle.reset}")
-print(f"Current window: {throttle.current}")
+print(f"Remaining requests: {limit.remaining}")
+print(f"Reset time: {limit.reset}")
 ```
 
 ## Proxy Support
@@ -354,8 +288,6 @@ response = await crawlpy.get(
     headers=headers
 )
 ```
-
-
 
 ## Error Handling
 
