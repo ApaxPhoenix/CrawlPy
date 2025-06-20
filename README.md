@@ -272,11 +272,11 @@ response = await crawlpy.get('https://httpbin.org/ip', pool=proxies)
 print(f"Response: {response.parse()}")
 
 # Advanced proxy configuration
-configuration = {
+proxy = {
     'http': 'http://proxy.example.com:8080',
     'https': 'https://secure-proxy.example.com:8443'
 }
-response = await crawlpy.get('https://httpbin.org/ip', proxy=configuration)
+response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
 
 # Proxy with custom authentication
 import base64
