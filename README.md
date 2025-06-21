@@ -247,46 +247,65 @@ print(f"Reset time: {limit.reset}")
 
 ## Proxy Support
 
-CrawlPy provides comprehensive proxy support for anonymous browsing, location spoofing, and load distribution.
+CrawlPy offers robust proxy integration for enhanced privacy, geographic diversity, and load distribution across your HTTP requests. The library supports both single proxy configurations and intelligent proxy cluster management.
 
 ```python
-# Configure single proxy for request
+# Single proxy configuration for basic anonymization
 response = await crawlpy.get(
     'https://httpbin.org/ip',
     proxy='http://proxy.example.com:8080'
 )
 
-# Use authenticated proxy
-endpoint = 'http://user:pass@proxy.example.com:8080'
-response = await crawlpy.get('https://httpbin.org/ip', proxy=endpoint)
+# Authenticated proxy with credentials embedded in URL
+proxy = 'http://username:password@proxy.example.com:8080'
+response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
 
-# Configure proxy pool for automatic rotation
-proxies = [
-    'http://proxy1.example.com:8080',
-    'http://proxy2.example.com:8080',
-    'http://proxy3.example.com:8080'
+# Proxy cluster with automatic rotation and failover
+proxy = [
+    'http://us-east.proxy.com:8080',      # US East Coast endpoint
+    'http://eu-west.proxy.com:8080',      # European endpoint  
+    'http://asia-pacific.proxy.com:8080'  # Asia-Pacific endpoint
 ]
 
-# Execute request with automatic proxy rotation
-response = await crawlpy.get('https://httpbin.org/ip', pool=proxies)
-print(f"Response: {response.parse()}")
+# Requests automatically cycle through available proxies
+response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
+print(f"Routed through: {response.parse()['origin']}")
 
-# Advanced proxy configuration
+# Protocol-specific proxy routing configuration
 proxy = {
-    'http': 'http://proxy.example.com:8080',
-    'https': 'https://secure-proxy.example.com:8443'
+    'http': 'http://fast-proxy.example.com:8080',     # HTTP traffic routing
+    'https': 'https://secure-proxy.example.com:8443'  # HTTPS traffic routing
 }
 response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
 
-# Proxy with custom authentication
+# Manual proxy authentication using custom headers
 import base64
-auth = base64.b64encode(b'username:password').decode('ascii')
+auth = base64.b64encode(b'admin:secret123').decode('ascii')
 headers = {'Proxy-Authorization': f'Basic {auth}'}
 response = await crawlpy.get(
     'https://httpbin.org/ip',
-    proxy='http://proxy.example.com:8080',
+    proxy='http://corporate-proxy.internal:3128',
     headers=headers
 )
+
+# Proxy cluster with geographic load balancing
+proxy = [
+    'http://nyc-01.proxies.com:8080',    # New York data center
+    'http://lax-01.proxies.com:8080',    # Los Angeles data center
+    'http://mia-01.proxies.com:8080',    # Miami data center
+    'http://chi-01.proxies.com:8080'     # Chicago data center
+]
+
+# Each request intelligently selects optimal proxy endpoint
+responses = await crawlpy.get([
+    'https://api.weather.com/forecast',
+    'https://api.news.com/headlines', 
+    'https://api.finance.com/stocks'
+], proxy=proxy)
+
+# Monitor proxy cluster performance and availability
+for response in responses:
+    print(f"Response time: {response.elapsed}s via {response.url}")
 ```
 
 ## Error Handling
