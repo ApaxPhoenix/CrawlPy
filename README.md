@@ -35,34 +35,70 @@ response = await crawlpy.get('https://httpbin.org/get')
 ### POST Request
 ```python
 # JSON data
-json = {'name': 'John', 'email': 'john@example.com'}
-response = await crawlpy.post('https://httpbin.org/post', json=json)
+data = {'name': 'John', 'email': 'john@example.com'}
+response = await crawlpy.post('https://httpbin.org/post', json=data)
 
 # Form data
-data = {'username': 'john', 'password': 'secret'}
-response = await crawlpy.post('https://httpbin.org/post', data=data)
+form = {'username': 'john', 'password': 'secret'}
+response = await crawlpy.post('https://httpbin.org/post', data=form)
 ```
 
 ### Other Methods
 ```python
-response = await crawlpy.put('https://httpbin.org/put', json=json)
+response = await crawlpy.put('https://httpbin.org/put', json=data)
 response = await crawlpy.delete('https://httpbin.org/delete')
-response = await crawlpy.patch('https://httpbin.org/patch', json=json)
+response = await crawlpy.patch('https://httpbin.org/patch', json=data)
+response = await crawlpy.head('https://httpbin.org/get')
+response = await crawlpy.options('https://httpbin.org/get')
 ```
 
-## Request Options
+# Request Configuration
+
+## Headers and Parameters
 
 ```python
 # Custom headers
-headers = {'User-Agent': 'MyApp/1.0'}
+headers = {'User-Agent': 'CrawlPy'}
 response = await crawlpy.get('https://httpbin.org/get', headers=headers)
 
 # Query parameters
 params = {'page': 1, 'limit': 10}
 response = await crawlpy.get('https://httpbin.org/get', params=params)
+```
 
-# Timeout in seconds
-response = await crawlpy.get('https://httpbin.org/get', timeout=30.0)
+## Timeout Configuration
+
+```python
+# Simple timeout
+response = await crawlpy.get('https://httpbin.org/get', timeout=10.0)
+
+# Advanced timeout settings
+timeout = crawlpy.Timeout(connect=5.0, read=30.0, write=10.0, pool=60.0)
+response = await crawlpy.get('https://httpbin.org/get', timeout=timeout)
+```
+
+## Retry Logic
+
+```python
+# Basic retry
+retry = crawlpy.Retry(total=3)
+response = await crawlpy.get('https://httpbin.org/get', retry=retry)
+
+# Advanced retry with backoff
+retry = crawlpy.Retry(total=5, backoff=1.5, status=[500, 502, 503, 504])
+response = await crawlpy.get('https://httpbin.org/get', retry=retry)
+```
+
+## Connection Pooling
+
+```python
+# Custom connection limits
+limits = crawlpy.Limits(max_connections=50, max_keepalive=10)
+response = await crawlpy.get('https://httpbin.org/get', limits=limits)
+
+# Per-host limits
+limits = crawlpy.Limits(max_connections=100, max_per_host=20)
+response = await crawlpy.get('https://httpbin.org/get', limits=limits)
 ```
 
 ## Response Object
@@ -70,29 +106,44 @@ response = await crawlpy.get('https://httpbin.org/get', timeout=30.0)
 ```python
 response = await crawlpy.get('https://httpbin.org/json')
 
-# Response properties
-print(response.status)    # HTTP status code (200, 404, etc.)
-print(response.text)      # Response body as text
-print(response.json())    # Parse JSON response
-print(response.headers)   # Response headers dict
-print(response.url)       # Final URL after redirects
-print(response.type)      # Content type (e.g., 'application/json', 'text/html')
-print(response.content)   # Raw bytes
-print(response.encoding)  # Character encoding
-print(response.elapsed)   # Request duration as timedelta object
+# Status and basic info
+print(response.status)          # 200
+print(response.reason)          # 'OK'
+print(response.url)             # Final URL after redirects
+print(response.encoding)        # 'utf-8'
+print(response.elapsed)         # Request duration as timedelta
+
+# Content access
+print(response.text)            # Response as text
+print(response.content)         # Raw bytes
+print(response.json())          # Parse JSON
+print(response.headers)         # Headers dict-like object
+print(response.type)            # Content type (e.g., 'application/json', 'text/html')
 ```
 
-## Sessions
+# Sessions
 
 ```python
-# Use sessions to persist cookies and headers
+# Session with persistent settings
 async with crawlpy.Session() as session:
-    # Set session-wide headers
+    # Configure session-wide settings
     session.headers.update({'Authorization': 'Bearer token123'})
+    session.cookies.update({'session_id': 'abc123'})
     
-    # Make requests with persistent session
-    response1 = await session.get('https://api.example.com/user')
-    response2 = await session.get('https://api.example.com/data')
+    # All requests in this session will use these settings
+    user = await session.get('https://api.example.com/user')
+    data = await session.get('https://api.example.com/data')
+
+# Session with configuration
+session = crawlpy.Session(
+    timeout=crawlpy.Timeout(connect=5.0, read=30.0),
+    retry=crawlpy.Retry(total=3, backoff=2.0),
+    limits=crawlpy.Limits(max_connections=100, max_keepalive=20),
+    proxies={'https': 'http://proxy.example.com:8080'}
+)
+
+async with session:
+    response = await session.get('https://api.example.com/data')
 ```
 
 ## Proxy Support
@@ -102,20 +153,42 @@ async with crawlpy.Session() as session:
 response = await crawlpy.get('https://httpbin.org/ip', proxy='http://proxy.com:8080')
 
 # Proxy with authentication
-proxy = 'http://username:password@proxy.com:8080'
+proxy = 'http://user:pass@proxy.com:8080'
 response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
 ```
 
-## Authentication
+# Authentication
+
+## Basic Authentication
 
 ```python
 # Basic authentication
-response = await crawlpy.get('https://httpbin.org/basic-auth/user/pass', 
-                           auth=('user', 'pass'))
+auth = crawlpy.BasicAuth('username', 'password')
+response = await crawlpy.get('https://api.example.com/secure', auth=auth)
+```
 
+## Digest Authentication
+
+```python
+# Digest authentication
+auth = crawlpy.DigestAuth('username', 'password')
+response = await crawlpy.get('https://api.example.com/secure', auth=auth)
+```
+
+## Bearer Token
+
+```python
 # Bearer token
-headers = {'Authorization': 'Bearer your-token-here'}
-response = await crawlpy.get('https://api.example.com/data', headers=headers)
+auth = crawlpy.BearerAuth('your-jwt-token')
+response = await crawlpy.get('https://api.example.com/secure', auth=auth)
+```
+
+## OAuth
+
+```python
+# OAuth authentication
+auth = crawlpy.OAuth('consumer_key', 'consumer_secret', 'token', 'token_secret')
+response = await crawlpy.get('https://api.example.com/secure', auth=auth)
 ```
 
 
@@ -138,11 +211,18 @@ print(response.cookies)
 ## SSL Configuration
 
 ```python
-# Disable SSL verification (not recommended for production)
-response = await crawlpy.get('https://httpbin.org/get', verify=False)
+import ssl
 
-# Custom SSL certificate
-response = await crawlpy.get('https://httpbin.org/get', cert='/path/to/cert.pem')
+# Custom SSL context
+context = ssl.create_default_context()
+context.check_hostname = False
+context.verify_mode = ssl.CERT_REQUIRED
+response = await crawlpy.get('https://example.com', ssl=context)
+
+# Client certificate
+context = ssl.create_default_context()
+context.load_cert_chain('/path/to/cert.pem', '/path/to/key.pem')
+response = await crawlpy.get('https://example.com', ssl=context)
 ```
 
 
