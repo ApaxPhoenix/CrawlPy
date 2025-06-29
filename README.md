@@ -85,7 +85,6 @@ response = await crawlpy.get('https://httpbin.org/get', parameters=parameters)
 Configure timeouts to control how long requests wait for responses and connections.
 
 ```python
-import crawlpy
 from crawlpy import Timeout
 
 # Simple timeout
@@ -101,7 +100,6 @@ response = await crawlpy.get('https://httpbin.org/get', timeout=timeout)
 Implement retry logic to handle temporary failures and improve request reliability.
 
 ```python
-import crawlpy
 from crawlpy import Retry
 
 # Basic retry
@@ -118,7 +116,6 @@ response = await crawlpy.get('https://httpbin.org/get', retry=retry)
 Optimize performance by managing connection pools and limiting concurrent connections.
 
 ```python
-import crawlpy
 from crawlpy import Limits
 
 # Custom connection limits
@@ -177,7 +174,6 @@ Sessions allow you to persist settings across multiple requests and maintain sta
 Configure sessions with custom timeout, retry, and connection settings.
 
 ```python
-import crawlpy
 from crawlpy import Session, Timeout, Retry, Limits
 
 # Session with configuration
