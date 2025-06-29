@@ -147,9 +147,25 @@ print(response.type)            # Content type (e.g., 'application/json', 'text/
 
 ## Session Management
 
-Sessions allow you to persist settings across multiple requests and maintain state.
+Sessions allow you to persist settings across multiple requests and maintain cookies automatically.
 
-### Basic Session Usage
+### Static Sessions
+
+Create sessions to reuse configuration and maintain state across requests.
+
+```python
+# Session with persistent settings
+async with crawlpy.Session() as session:
+    # Configure session-wide settings
+    session.headers.update({'Authorization': 'Bearer token123'})
+    session.cookies.update({'session_id': 'abc123'})
+    
+    # All requests in this session will use these settings
+    user = await session.get('https://api.example.com/user')
+    data = await session.get('https://api.example.com/data')
+```
+
+### Dynamic Sessions
 
 Configure sessions with custom timeout, retry, and connection settings.
 
@@ -163,12 +179,7 @@ session = crawlpy.Session(
 )
 
 async with session:
-    # Configure session-wide headers
-    session.headers.update({'Authorization': 'Bearer token123'})
-    
-    # All requests in this session will use these settings
-    user = await session.get('https://api.example.com/user')
-    data = await session.get('https://api.example.com/data')
+    response = await session.get('https://api.example.com/data')
 ```
 
 ### Session Adapters
@@ -192,9 +203,20 @@ async with crawlpy.Session() as session:
 
 Route requests through proxy servers for security or access requirements.
 
-### Single Proxy
+### Simple Proxy Usage
 
-Configure and use a single proxy for your requests.
+```python
+# Use a proxy server
+response = await crawlpy.get('https://httpbin.org/ip', proxy='http://proxy.com:8080')
+
+# Proxy with authentication
+proxy = 'http://user:pass@proxy.com:8080'
+response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
+```
+
+### Proxy Class Management
+
+Use the Proxy class to manage proxy configurations more effectively.
 
 ```python
 # Create proxy instance
@@ -208,13 +230,7 @@ proxy = crawlpy.Proxy(
 
 # Use proxy with requests
 response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
-```
 
-### Multiple Proxies
-
-Use different proxies for different protocols or requirements.
-
-```python
 # Multiple proxies for different protocols
 proxies = {
     'http': crawlpy.Proxy('http://proxy1.com:8080'),
@@ -223,7 +239,18 @@ proxies = {
 response = await crawlpy.get('https://api.example.com/data', proxies=proxies)
 ```
 
+## Cookie Management
 
+Handle cookies for session management and stateful interactions.
+
+```python
+# Send cookies
+cookies = {'session_id': 'abc123', 'user': 'john'}
+response = await crawlpy.get('https://httpbin.org/cookies', cookies=cookies)
+
+# Access response cookies
+print(response.cookies)
+```
 
 ## SSL Configuration
 
