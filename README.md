@@ -35,11 +35,15 @@ CrawlPy supports all standard HTTP methods. Each method returns a response objec
 
 ### GET Requests
 ```python
+import crawlpy
+
 response = await crawlpy.get('https://httpbin.org/get')
 ```
 
 ### POST Requests
 ```python
+import crawlpy
+
 # JSON data
 data = {'name': 'John', 'email': 'john@example.com'}
 response = await crawlpy.post('https://httpbin.org/post', json=data)
@@ -51,6 +55,8 @@ response = await crawlpy.post('https://httpbin.org/post', data=form)
 
 ### Other HTTP Methods
 ```python
+import crawlpy
+
 response = await crawlpy.put('https://httpbin.org/put', json=data)
 response = await crawlpy.delete('https://httpbin.org/delete')
 response = await crawlpy.patch('https://httpbin.org/patch', json=data)
@@ -63,6 +69,8 @@ response = await crawlpy.options('https://httpbin.org/get')
 Control request headers and URL parameters to customize how your requests are sent.
 
 ```python
+import crawlpy
+
 # Custom headers
 headers = {'User-Agent': 'CrawlPy'}
 response = await crawlpy.get('https://httpbin.org/get', headers=headers)
@@ -77,11 +85,14 @@ response = await crawlpy.get('https://httpbin.org/get', parameters=parameters)
 Configure timeouts to control how long requests wait for responses and connections.
 
 ```python
+import crawlpy
+from crawlpy import Timeout
+
 # Simple timeout
 response = await crawlpy.get('https://httpbin.org/get', timeout=10.0)
 
 # Detailed timeout settings
-timeout = crawlpy.Timeout(connect=5.0, read=30.0, write=10.0, pool=60.0)
+timeout = Timeout(connect=5.0, read=30.0, write=10.0, pool=60.0)
 response = await crawlpy.get('https://httpbin.org/get', timeout=timeout)
 ```
 
@@ -90,12 +101,15 @@ response = await crawlpy.get('https://httpbin.org/get', timeout=timeout)
 Implement retry logic to handle temporary failures and improve request reliability.
 
 ```python
+import crawlpy
+from crawlpy import Retry
+
 # Basic retry
-retry = crawlpy.Retry(total=3)
+retry = Retry(total=3)
 response = await crawlpy.get('https://httpbin.org/get', retry=retry)
 
 # Flexible retry with backoff
-retry = crawlpy.Retry(total=5, backoff=1.5, status=[500, 502, 503, 504])
+retry = Retry(total=5, backoff=1.5, status=[500, 502, 503, 504])
 response = await crawlpy.get('https://httpbin.org/get', retry=retry)
 ```
 
@@ -104,12 +118,15 @@ response = await crawlpy.get('https://httpbin.org/get', retry=retry)
 Optimize performance by managing connection pools and limiting concurrent connections.
 
 ```python
+import crawlpy
+from crawlpy import Limits
+
 # Custom connection limits
-limits = crawlpy.Limits(connections=50, keepalive=10)
+limits = Limits(connections=50, keepalive=10)
 response = await crawlpy.get('https://httpbin.org/get', limits=limits)
 
 # Per-host limits
-limits = crawlpy.Limits(connections=100, host=20)
+limits = Limits(connections=100, host=20)
 response = await crawlpy.get('https://httpbin.org/get', limits=limits)
 ```
 
@@ -122,6 +139,8 @@ Learn how to work with response objects and extract data from HTTP responses.
 Access various properties of the response to get status information and metadata.
 
 ```python
+import crawlpy
+
 response = await crawlpy.get('https://httpbin.org/json')
 
 # Status and basic info
@@ -137,6 +156,10 @@ print(response.elapsed)         # Request duration as timedelta
 Extract and parse response content in different formats.
 
 ```python
+import crawlpy
+
+response = await crawlpy.get('https://httpbin.org/json')
+
 # Content access
 print(response.text)            # Response as text
 print(response.content)         # Raw bytes
@@ -147,39 +170,31 @@ print(response.type)            # Content type (e.g., 'application/json', 'text/
 
 ## Session Management
 
-Sessions allow you to persist settings across multiple requests and maintain cookies automatically.
+Sessions allow you to persist settings across multiple requests and maintain state.
 
-### Static Sessions
-
-Create sessions to reuse configuration and maintain state across requests.
-
-```python
-# Session with persistent settings
-async with crawlpy.Session() as session:
-    # Configure session-wide settings
-    session.headers.update({'Authorization': 'Bearer token123'})
-    session.cookies.update({'session_id': 'abc123'})
-    
-    # All requests in this session will use these settings
-    user = await session.get('https://api.example.com/user')
-    data = await session.get('https://api.example.com/data')
-```
-
-### Dynamic Sessions
+### Basic Session Usage
 
 Configure sessions with custom timeout, retry, and connection settings.
 
 ```python
+import crawlpy
+from crawlpy import Session, Timeout, Retry, Limits
+
 # Session with configuration
-session = crawlpy.Session(
-    timeout=crawlpy.Timeout(connect=5.0, read=30.0),
-    retry=crawlpy.Retry(total=3, backoff=2.0),
-    limits=crawlpy.Limits(connections=100, keepalive=20),
+session = Session(
+    timeout=Timeout(connect=5.0, read=30.0),
+    retry=Retry(total=3, backoff=2.0),
+    limits=Limits(connections=100, keepalive=20),
     proxies={'https': 'http://proxy.example.com:8080'}
 )
 
 async with session:
-    response = await session.get('https://api.example.com/data')
+    # Configure session-wide headers
+    session.headers.update({'Authorization': 'Bearer token123'})
+    
+    # All requests in this session will use these settings
+    user = await session.get('https://api.example.com/user')
+    data = await session.get('https://api.example.com/data')
 ```
 
 ### Session Adapters
@@ -187,14 +202,17 @@ async with session:
 Use adapters to customize how sessions handle specific protocols or domains.
 
 ```python
+import crawlpy
+from crawlpy import Session, HTTPAdapter, Retry
+
 # Custom adapter for specific domain
-adapter = crawlpy.HTTPAdapter(
-    retries=crawlpy.Retry(total=5),
+adapter = HTTPAdapter(
+    retries=Retry(total=5),
     connections=20,
     maxsize=50
 )
 
-async with crawlpy.Session() as session:
+async with Session() as session:
     session.mount('https://api.example.com', adapter)
     response = await session.get('https://api.example.com/data')
 ```
@@ -203,24 +221,16 @@ async with crawlpy.Session() as session:
 
 Route requests through proxy servers for security or access requirements.
 
-### Simple Proxy Usage
+### Single Proxy
+
+Configure and use a single proxy for your requests.
 
 ```python
-# Use a proxy server
-response = await crawlpy.get('https://httpbin.org/ip', proxy='http://proxy.com:8080')
+import crawlpy
+from crawlpy import Proxy
 
-# Proxy with authentication
-proxy = 'http://user:pass@proxy.com:8080'
-response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
-```
-
-### Proxy Class Management
-
-Use the Proxy class to manage proxy configurations more effectively.
-
-```python
 # Create proxy instance
-proxy = crawlpy.Proxy(
+proxy = Proxy(
     host='proxy.example.com',
     port=8080,
     username='user',
@@ -230,26 +240,22 @@ proxy = crawlpy.Proxy(
 
 # Use proxy with requests
 response = await crawlpy.get('https://httpbin.org/ip', proxy=proxy)
+```
+
+### Multiple Proxies
+
+Use different proxies for different protocols or requirements.
+
+```python
+import crawlpy
+from crawlpy import Proxy
 
 # Multiple proxies for different protocols
 proxies = {
-    'http': crawlpy.Proxy('http://proxy1.com:8080'),
-    'https': crawlpy.Proxy('https://proxy2.com:8080', username='user', password='pass')
+    'http': Proxy('http://proxy1.com:8080'),
+    'https': Proxy('https://proxy2.com:8080', username='user', password='pass')
 }
 response = await crawlpy.get('https://api.example.com/data', proxies=proxies)
-```
-
-## Cookie Management
-
-Handle cookies for session management and stateful interactions.
-
-```python
-# Send cookies
-cookies = {'session_id': 'abc123', 'user': 'john'}
-response = await crawlpy.get('https://httpbin.org/cookies', cookies=cookies)
-
-# Access response cookies
-print(response.cookies)
 ```
 
 ## SSL Configuration
@@ -258,6 +264,7 @@ Customize SSL/TLS settings for secure connections and certificate handling.
 
 ```python
 import ssl
+import crawlpy
 
 # Custom SSL context
 context = ssl.create_default_context()
@@ -280,19 +287,22 @@ Properly handle different types of errors that can occur during HTTP requests.
 Catch and handle specific types of HTTP and network errors.
 
 ```python
+import crawlpy
+from crawlpy import HTTPError, TimeoutError, ConnectionError, RequestError
+
 try:
     response = await crawlpy.get('https://httpbin.org/status/404')
     response.raise_for_status()  # Raises exception for 4xx/5xx status codes
     
-except crawlpy.HTTPError as error:
+except HTTPError as error:
     print(f"HTTP error: {error.response.status}")
     
-except crawlpy.TimeoutError as error:
+except TimeoutError as error:
     print(f"Request timed out: {error}")
     
-except crawlpy.ConnectionError as error:
+except ConnectionError as error:
     print(f"Connection failed: {error}")
     
-except crawlpy.RequestError as error:
+except RequestError as error:
     print(f"Request error: {error}")
 ```
