@@ -34,164 +34,237 @@ asyncio.run(main())
 CrawlPy supports all standard HTTP methods. Each method returns a response object with the server's reply.
 
 ### GET Requests
-Get requests are perfect for retrieving data from servers. They support query parameters and custom headers.
+
+Get requests retrieve data from servers and are perfect for fetching resources.
 
 ```python
 import crawlpy
 
+# Basic data retrieval - returns user info from API
 response = await crawlpy.get('https://httpbin.org/get')
+print(response.json())  # Shows request details and headers
 
-# With query parameters
-response = await crawlpy.get(
-    'https://httpbin.org/get', 
-    parameters={'page': 1, 'limit': 10}
-)
+# Paginated data with query params - fetches page 1 with 10 items
+parameters = {'page': 1, 'limit': 10}
+response = await crawlpy.get('https://api.example.com/users', params=parameters)
+# URL becomes: https://api.example.com/users?page=1&limit=10
+
+# Authenticated request - accesses protected user data
+headers = {'Authorization': 'Bearer token', 'Accept': 'application/json'}
+response = await crawlpy.get('https://api.example.com/profile', headers=headers)
+# Returns 200 with user profile data or 401 if token invalid
+
+# Search with multiple tags - finds posts matching any tag
+parameters = {'tags': ['python', 'async', 'http'], 'active': True}
+response = await crawlpy.get('https://api.example.com/posts', params=parameters)
+# URL: ?tags=python&tags=async&tags=http&active=true
+
+# Text search with filters - searches content with status filter
+parameters = {'q': 'machine learning', 'category': 'tech', 'year': 2024}
+headers = {'User-Agent': 'CrawlPy/1.0'}
+response = await crawlpy.get('https://api.example.com/search', params=parameters, headers=headers)
+# Returns matching articles published in 2024
 ```
 
 ### POST Requests
-Post requests are used for creating resources and submitting data. They support both JSON and form data.
+
+Post requests create new resources and submit data to servers.
 
 ```python
 import crawlpy
 
-# JSON data
-json = {'name': 'John', 'email': 'john@example.com'}
-response = await crawlpy.post('https://httpbin.org/post', json=json)
+# Create new user account - returns 201 with user ID
+data = {'name': 'Alice', 'email': 'alice@example.com', 'role': 'admin'}
+response = await crawlpy.post('https://api.example.com/users', json=data)
+print(response.json()['id'])  # New user ID from server
 
-# Form data
-data = {'username': 'john', 'password': 'secret'}
-response = await crawlpy.post('https://httpbin.org/post', data=data)
+# Login with form data - returns auth token on success
+form = {'username': 'alice', 'password': 'secret'}
+headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+response = await crawlpy.post('https://api.example.com/login', data=form, headers=headers)
+# Returns 200 with {"token": "abc123"} or 401 for invalid credentials
+
+# Upload document with metadata - creates file record
+files = {'document': open('report.pdf', 'rb')}
+data = {'title': 'Q4 Report', 'category': 'finance', 'public': False}
+parameters = {'folder': 'reports', 'notify': True}
+response = await crawlpy.post('https://api.example.com/upload', files=files, data=data, params=parameters)
+# Returns 201 with file URL and metadata
+
+# Submit order with tracking - creates order and sends confirmation
+headers = {'Authorization': 'Bearer token', 'Idempotency-Key': 'order-123'}
+order = {'items': [{'id': 1, 'qty': 2}], 'shipping': 'express'}
+parameters = {'calculate_tax': True, 'send_email': True}
+response = await crawlpy.post('https://api.example.com/orders', json=order, headers=headers, params=parameters)
+# Returns 201 with order number and total cost including tax
 ```
 
 ### PUT Requests
-Put requests are used for updating or creating resources with a complete replacement.
+
+Put requests completely replace existing resources with new data.
 
 ```python
 import crawlpy
 
-# Update resource with JSON
-json = {'id': 1, 'name': 'Updated Name', 'status': 'active'}
-response = await crawlpy.put('https://httpbin.org/put', json=json)
+# Update user profile completely - replaces all user data
+customer = {'identifier': 1, 'fullname': 'Alice Updated', 'contact': 'alice.new@example.com', 'status': 'active'}
+parameters = {'validate': True, 'send_notification': False}
+response = await crawlpy.put('https://api.example.com/users/1', json=customer, params=parameters)
+# Returns 200 with updated user data or 404 if user not found
 
-# Update with form data
-data = {'field1': 'value1', 'field2': 'value2'}
-response = await crawlpy.put('https://httpbin.org/put', data=data)
+# Replace configuration settings - overwrites entire config
+headers = {'Content-Type': 'application/json'}
+configuration = {'theme': 'dark', 'notifications': True, 'language': 'english'}
+response = await crawlpy.put('https://api.example.com/settings', json=configuration, headers=headers)
+# Returns 200 with confirmation or 403 if unauthorized
+
+# Update file with versioning - replaces file content
+headers = {'If-Match': 'etag123', 'Content-Type': 'text/plain'}
+document = {'content': 'Updated document content', 'version': 2}
+parameters = {'create_backup': True, 'preserve_history': True}
+response = await crawlpy.put('https://api.example.com/documents/123', json=document, headers=headers, params=parameters)
+# Returns 200 with new etag or 412 if etag mismatch (concurrent edit)
 ```
 
 ### DELETE Requests
-Delete requests are used for removing resources from the server.
+
+Delete requests remove resources from the server permanently.
 
 ```python
 import crawlpy
 
-# Simple delete
-response = await crawlpy.delete('https://httpbin.org/delete')
+# Delete user account with confirmation - removes user permanently
+parameters = {'confirm': True, 'transfer_data': False}
+headers = {'Authorization': 'Bearer admin-token'}
+response = await crawlpy.delete('https://api.example.com/users/123', params=parameters, headers=headers)
+# Returns 204 (no content) on success or 404 if user not found
 
-# Delete with confirmation data
-json = {'confirm': True, 'reason': 'No longer needed'}
-response = await crawlpy.delete('https://httpbin.org/delete', json=json)
+# Soft delete with reason - marks item as deleted but keeps data
+data = {'reason': 'spam', 'preserve_relations': True}
+parameters = {'soft_delete': True, 'notify_moderators': True}
+response = await crawlpy.delete('https://api.example.com/posts/456', json=data, params=parameters)
+# Returns 200 with deletion timestamp and recovery token
+
+# Bulk delete operation - removes multiple items at once
+items = {'ids': [1, 2, 3, 4], 'cascade': True}
+headers = {'Content-Type': 'application/json', 'X-Bulk-Operation': 'true'}
+parameters = {'dry_run': False, 'max_items': 100}
+response = await crawlpy.delete('https://api.example.com/cleanup', json=items, headers=headers, params=parameters)
+# Returns 200 with count of deleted items and any failures
 ```
 
 ### PATCH Requests
-Patch requests are used for partial updates to existing resources.
+
+Patch requests partially update existing resources without replacing everything.
 
 ```python
 import crawlpy
 
-# Partial update with JSON
-json = {'status': 'inactive'}
-response = await crawlpy.patch('https://httpbin.org/patch', json=json)
+# Update only specific fields - changes just status and priority
+update = {'status': 'completed', 'priority': 'low'}
+parameters = {'validate_dependencies': True, 'send_notification': False}
+response = await crawlpy.patch('https://api.example.com/tasks/789', json=update, params=parameters)
+# Returns 200 with updated task or 400 if validation fails
 
-# Patch with form fields
-data = {'field_to_update': 'new_value'}
-response = await crawlpy.patch('https://httpbin.org/patch', data=data)
+# Partial profile update - updates only provided fields
+headers = {'Content-Type': 'application/merge-patch+json', 'Authorization': 'Bearer token'}
+changes = {'bio': 'Updated bio text', 'location': 'New York'}
+response = await crawlpy.patch('https://api.example.com/profile', json=changes, headers=headers)
+# Returns 200 with patched profile, other fields remain unchanged
+
+# Atomic field updates - ensures all changes apply or none do
+parameters = {'atomic': True, 'validate_business_rules': True}
+fields = {'price': 29.99, 'discount': 10, 'active': True}
+headers = {'If-Unmodified-Since': 'Wed, 21 Oct 2024 07:28:00 GMT'}
+response = await crawlpy.patch('https://api.example.com/products/123', json=fields, headers=headers, params=parameters)
+# Returns 200 if successful, 409 if concurrent modification detected
 ```
 
 ### HEAD Requests
-Head requests retrieve only the headers without the response body, useful for checking resource metadata.
+
+Head requests check resource metadata without downloading the actual content.
 
 ```python
 import crawlpy
 
-response = await crawlpy.head('https://httpbin.org/get')
-# Only headers are returned, no body content
-print(response.headers)
+# Check if large file exists and get size - saves bandwidth
+parameters = {'include_metadata': True}
+response = await crawlpy.head('https://cdn.example.com/video.mp4', params=parameters)
+size = response.headers.get('Content-Length')  # File size in bytes
+# Returns headers only, no file downloaded
+
+# Verify authentication and permissions - quick access check  
+headers = {'Authorization': 'Bearer token'}
+parameters = {'check_permissions': 'read,write'}
+response = await crawlpy.head('https://api.example.com/private-data', headers=headers, params=parameters)
+# Returns 200 if authorized, 401/403 if not, without transferring data
+
+# Check document freshness - see if content changed
+headers = {'If-Modified-Since': 'Mon, 15 Jan 2024 10:00:00 GMT'}
+response = await crawlpy.head('https://api.example.com/reports/latest', headers=headers)
+# Returns 304 if unchanged, 200 with new last-modified if updated
+last_modified = response.headers.get('Last-Modified')
 ```
 
 ### OPTIONS Requests
-Options requests are used to determine the communication options available for a resource.
+
+Options requests discover what HTTP methods and headers are allowed for a resource.
 
 ```python
 import crawlpy
 
-response = await crawlpy.options('https://httpbin.org/get')
-# Check allowed methods
-print(response.headers.get('Allow'))
+# Discover API capabilities - check what methods are supported
+response = await crawlpy.options('https://api.example.com/users')
+allowed_methods = response.headers.get('Allow')  # 'GET, POST, PUT, DELETE'
+# Shows which operations are permitted on the users endpoint
+
+# CORS preflight check - verify cross-origin request permissions
+headers = {
+    'Origin': 'https://myapp.com',
+    'Access-Control-Request-Method': 'POST',
+    'Access-Control-Request-Headers': 'Content-Type, Authorization'
+}
+response = await crawlpy.options('https://api.example.com/data', headers=headers)
+# Returns CORS headers indicating if cross-origin POST is allowed
+
+# API exploration with detailed info - get comprehensive endpoint data
+parameters = {'format': 'detailed', 'include_schemas': True}
+headers = {'Accept': 'application/vnd.api+json'}
+response = await crawlpy.options('https://api.example.com/v1', params=parameters, headers=headers)
+# Returns detailed API documentation and supported operations
 ```
 
-## Additional Requests
+## Advanced Requests
 
 For additional flexibility, use the request method to create HTTP requests with any method and configuration.
 
 ```python
 import crawlpy
 
-# Additional method request
+# Custom method request
 response = await crawlpy.request('PROPFIND', 'https://httpbin.org/webdav')
 
-# Additional request with configuration
+# Advanced request with full configuration
+headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer token'}
+parameters = {'depth': 1, 'include': 'properties'}
+data = {'query': 'status:active', 'limit': 50}
 response = await crawlpy.request(
-    method='MERGE',
-    url='https://httpbin.org/merge',
-    headers={'Content-Type': 'application/json'},
-    json={'field': 'value'},
+    method='SEARCH',
+    url='https://api.example.com/search',
+    headers=headers,
+    params=parameters,
+    json=data,
     timeout=30.0
 )
-```
 
-## Headers and Parameters
-
-Control request headers and URL parameters to customize how your requests are sent.
-
-### Headers
-
-```python
-import crawlpy
-
-# Custom headers
-headers = {'User-Agent': 'CrawlPy', 'Accept': 'application/json'}
-response = await crawlpy.get('https://httpbin.org/get', headers=headers)
-```
-
-### Parameters
-
-```python
-import crawlpy
-
-# Simple parameters
-params = {'page': 1, 'limit': 10, 'sort': 'name'}
-response = await crawlpy.get('https://api.example.com/users', params=params)
-
-# List parameters (multiple values for same key)
-params = {'tags': ['python', 'crawlpy', 'api']}
-response = await crawlpy.get('https://api.example.com/posts', params=params)
-# Results in: ?tags=python&tags=crawlpy&tags=api
-
-# Parameters with special characters
-params = {'search': 'hello world', 'filter': 'status:active'}
-response = await crawlpy.get('https://api.example.com/search', params=params)
-
-# Manual URL building (less preferred)
-url = 'https://api.example.com/users?page=1&limit=10'
-response = await crawlpy.get(url)
-
-# Combining headers and parameters
-headers = {'User-Agent': 'CrawlPy', 'Accept': 'application/json'}
-parameters = {'page': 1, 'limit': 10, 'sort': 'created_at'}
-response = await crawlpy.get(
-    'https://httpbin.org/get', 
-    headers=headers, 
-    parameters=parameters
+# WebDAV operations with parameters
+parameters = {'overwrite': False, 'lock': True}
+headers = {'Destination': '/new/location', 'Depth': 'infinity'}
+response = await crawlpy.request(
+    'MOVE',
+    'https://webdav.example.com/files/document.pdf',
+    headers=headers,
+    params=parameters
 )
 ```
 
@@ -309,77 +382,188 @@ CrawlPy provides built-in cookie management with the `Cookies()` class for handl
 from crawlpy import Cookies
 
 # Create cookie jar
-cookies = Cookies()
+jar = Cookies()
 
 # Add cookies
-cookies.set('session_id', 'abc123', domain='example.com')
-cookies.set('user_pref', 'dark_mode', domain='example.com', path='/app')
+jar.set('session', 'abc123', domain='example.com')
+jar.set('theme', 'dark', domain='example.com', path='/app')
 
 # Use cookies with requests
-response = await crawlpy.get('https://example.com/login', cookies=cookies)
+response = await crawlpy.get('https://example.com/login', cookies=jar)
 
 # Access cookies from response
-response_cookies = response.cookies
-print(response_cookies.get('auth_token'))
+cookies = response.cookies
+print(cookies.get('token'))
 
 # Cookie jar with expiration
-cookies.set(
-    'temp_token', 
+jar.set(
+    'temp', 
     'xyz789', 
     domain='api.example.com',
     expires=datetime.now() + timedelta(hours=1)
 )
 
 # Clear all cookies
-cookies.clear()
+jar.clear()
 
 # Remove specific cookie
-cookies.delete('session_id', domain='example.com')
+jar.delete('session', domain='example.com')
 ```
 
 ## Hooks
 
 Use hooks to intercept and modify requests and responses at different stages of the HTTP lifecycle.
 
+### Request Hooks
+
 ```python
 from crawlpy import Session
 
-def log_request(request):
-    """Hook to log outgoing requests"""
-    print(f"Sending {request.method} request to {request.url}")
-    return request
+def log_request(req):
+    """Log outgoing requests"""
+    print(f"Sending {req.method} to {req.url}")
+    return req
 
-def log_response(response):
-    """Hook to log incoming responses"""
-    print(f"Received {response.status} response from {response.url}")
-    return response
+def add_auth(req):
+    """Add authentication header"""
+    req.headers['Authorization'] = 'Bearer token'
+    return req
 
-def add_auth_header(request):
-    """Hook to add authentication to all requests"""
-    request.headers['Authorization'] = 'Bearer token123'
-    return request
+def add_timestamp(req):
+    """Add timestamp to requests"""
+    req.headers['X-Timestamp'] = str(time.time())
+    return req
 
-# Using hooks with session
-async with Session() as session:
+def validate_url(req):
+    """Validate request URLs"""
+    if not req.url.startswith('https://'):
+        raise ValueError("Only HTTPS URLs allowed")
+    return req
+```
+
+### Response Hooks
+
+```python
+def log_response(res):
+    """Log incoming responses"""
+    print(f"Received {res.status} from {res.url}")
+    return res
+
+def cache_response(res):
+    """Cache successful responses"""
+    if res.status == 200:
+        cache.store(res.url, res.content)
+    return res
+
+def validate_json(res):
+    """Validate JSON responses"""
+    if 'application/json' in res.headers.get('content-type', ''):
+        try:
+            res.json()  # Validate JSON
+        except ValueError:
+            raise ValueError("Invalid JSON response")
+    return res
+
+def track_metrics(res):
+    """Track response metrics"""
+    metrics.record(res.url, res.elapsed, res.status)
+    return res
+```
+
+### Using Hooks with Sessions
+
+```python
+from crawlpy import Session
+
+async with Session() as client:
     # Add request hooks
-    session.hooks['request'].append(log_request)
-    session.hooks['request'].append(add_auth_header)
+    client.hooks['request'].append(log_request)
+    client.hooks['request'].append(add_auth)
+    client.hooks['request'].append(validate_url)
     
     # Add response hooks
-    session.hooks['response'].append(log_response)
+    client.hooks['response'].append(log_response)
+    client.hooks['response'].append(cache_response)
+    client.hooks['response'].append(track_metrics)
     
-    # All requests will now trigger the hooks
-    response = await session.get('https://api.example.com/data')
+    # All requests trigger hooks
+    response = await client.get('https://api.example.com/data')
+```
 
-# Using hooks with individual requests
+### Using Hooks with Individual Requests
+
+```python
+# Single request with hooks
 response = await crawlpy.get(
     'https://api.example.com/data',
     hooks={
-        'request': [log_request, add_auth_header],
-        'response': [log_response]
+        'request': [log_request, add_auth],
+        'response': [log_response, validate_json]
     }
 )
+
+# Different hooks for different requests
+login_hooks = {
+    'request': [add_timestamp, log_request],
+    'response': [cache_response, track_metrics]
+}
+
+data_hooks = {
+    'request': [add_auth, validate_url],
+    'response': [validate_json, log_response]
+}
+
+login = await crawlpy.post('https://api.example.com/login', hooks=login_hooks)
+data = await crawlpy.get('https://api.example.com/data', hooks=data_hooks)
 ```
+
+### Hook Chaining and Error Handling
+
+```python
+def safe_hook(func):
+    """Wrapper for safe hook execution"""
+    def wrapper(obj):
+        try:
+            return func(obj)
+        except Exception as e:
+            print(f"Hook error: {e}")
+            return obj
+    return wrapper
+
+@safe_hook
+def risky_transform(req):
+    """Hook that might fail"""
+    req.headers['X-Custom'] = process_data(req.url)
+    return req
+
+# Conditional hooks
+def conditional_auth(req):
+    """Add auth only for certain domains"""
+    if 'api.example.com' in req.url:
+        req.headers['Authorization'] = 'Bearer token'
+    return req
+
+# Hook with state
+class RateLimitHook:
+    def __init__(self, limit=10):
+        self.limit = limit
+        self.count = 0
+        
+    def __call__(self, req):
+        if self.count >= self.limit:
+            raise Exception("Rate limit exceeded")
+        self.count += 1
+        return req
+
+rate_limit = RateLimitHook(limit=5)
+
+async with Session() as client:
+    client.hooks['request'].append(conditional_auth)
+    client.hooks['request'].append(rate_limit)
+    client.hooks['request'].append(risky_transform)
+```
+
+## Sessions
 
 Sessions allow you to persist settings across multiple requests and maintain state.
 
@@ -400,7 +584,7 @@ session = Session(
 
 async with session:
     # Configure session-wide headers
-    session.headers.update({'Authorization': 'Bearer token123'})
+    session.headers.update({'Authorization': 'Bearer token'})
     
     # All requests in this session will use these settings
     user = await session.get('https://api.example.com/user')
@@ -414,17 +598,17 @@ Prepare requests in advance for better performance and reusability.
 ```python
 from crawlpy import Session, Request
 
-async with Session() as session:
+async with Session() as client:
     # Prepare a request
-    request = Request(
+    req = Request(
         method='POST',
         url='https://api.example.com/data',
-        headers={'Authorization': 'Bearer token123'},
+        headers={'Authorization': 'Bearer token'},
         json={'name': 'John', 'email': 'john@example.com'}
     )
     
-    prepared = session.prepare(request)
-    response = await session.send(prepared)
+    prepared = client.prepare(req)
+    response = await client.send(prepared)
 ```
 
 ### Session Cookies
@@ -434,13 +618,13 @@ Manage cookies across requests within a session.
 ```python
 from crawlpy import Session
 
-async with Session() as session:
+async with Session() as client:
     # Set cookies
-    session.cookies.set('session_id', 'abc123')
-    session.cookies.set('user_pref', 'dark_mode')
+    client.cookies.set('session', 'abc123')
+    client.cookies.set('theme', 'dark')
     
     # Cookies are automatically included in all requests
-    response = await session.get('https://api.example.com/dashboard')
+    response = await client.get('https://api.example.com/dashboard')
 ```
 
 ### Session Adapters
@@ -458,9 +642,9 @@ adapter = HTTPAdapter(
     maxsize=50
 )
 
-async with Session() as session:
-    session.mount('https://api.example.com', adapter)
-    response = await session.get('https://api.example.com/data')
+async with Session() as client:
+    client.mount('https://api.example.com', adapter)
+    response = await client.get('https://api.example.com/data')
 ```
 
 ## Proxy Support
