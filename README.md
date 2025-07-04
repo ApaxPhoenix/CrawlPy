@@ -17,347 +17,260 @@ import asyncio
 import crawlpy
 
 async def main():
-    # Make a simple GET request
     response = await crawlpy.get('https://httpbin.org/get')
     print(f"Status: {response.status}")
     print(f"Content: {response.json()}")
 
-# Run the async function
 asyncio.run(main())
 ```
 
 ## HTTP Methods
 
+All the standard HTTP methods you'd expect, with clean async/await syntax:
+
 ### GET - Retrieve Data
 ```python
-# Basic GET request to fetch data
+# Basic GET request
 response = await crawlpy.get('https://api.example.com/users')
 
-# GET with query parameters (adds ?page=1&limit=10 to URL)
+# With query parameters
 params = {'page': 1, 'limit': 10}
 response = await crawlpy.get('https://api.example.com/users', params=params)
 
-# GET with custom headers (e.g., API key authentication)
-headers = {'X-API-Key': 'your-api-key-here', 'Accept': 'application/json'}
+# With custom headers
+headers = {'X-API-Key': 'your-api-key', 'Accept': 'application/json'}
 response = await crawlpy.get('https://api.example.com/profile', headers=headers)
 ```
 
 ### POST - Create Resources
 ```python
-# POST with JSON data (automatically sets Content-Type: application/json)
+# JSON data (automatically sets Content-Type)
 json = {'name': 'Alice', 'email': 'alice@example.com'}
 response = await crawlpy.post('https://api.example.com/users', json=json)
 
-# POST with form data (Content-Type: application/x-www-form-urlencoded)
+# Form data
 data = {'username': 'alice', 'password': 'secret'}
 response = await crawlpy.post('https://api.example.com/login', data=data)
 
-# POST with file upload (multipart/form-data)
+# File upload
 files = {'document': open('report.pdf', 'rb')}
 response = await crawlpy.post('https://api.example.com/upload', files=files)
 ```
 
-### PUT - Replace Resources
+### PUT, PATCH, DELETE, HEAD, OPTIONS
 ```python
-# PUT request to completely replace a resource
-json = {'id': 1, 'name': 'Alice Updated', 'email': 'alice@new.com'}
-response = await crawlpy.put('https://api.example.com/users/1', json=json)
-```
+# Replace entire resource
+response = await crawlpy.put('https://api.example.com/users/1', json=user)
 
-### PATCH - Partial Updates
-```python
-# PATCH request to partially update a resource
-json = {'status': 'completed', 'priority': 'high'}
-response = await crawlpy.patch('https://api.example.com/tasks/789', json=json)
-```
+# Partial update
+response = await crawlpy.patch('https://api.example.com/tasks/789', json={'status': 'done'})
 
-### DELETE - Remove Resources
-```python
-# DELETE request with confirmation parameter
-params = {'confirm': True}
-response = await crawlpy.delete('https://api.example.com/users/123', params=params)
-```
+# Delete resource
+response = await crawlpy.delete('https://api.example.com/users/123')
 
-### HEAD - Metadata Only
-```python
-# HEAD request to get headers without downloading content
+# Get headers only
 response = await crawlpy.head('https://cdn.example.com/large-file.zip')
-# Check file size without downloading
-size = response.headers.get('Content-Length')
-```
 
-### OPTIONS - Discover Capabilities
-```python
-# OPTIONS request to discover allowed HTTP methods
+# Discover capabilities
 response = await crawlpy.options('https://api.example.com/users')
-# Get supported methods from response
-methods = response.headers.get('Allow')
 ```
 
-## Custom Requests
-
-For advanced use cases or custom HTTP methods:
-
+### Custom Methods
 ```python
-# Custom HTTP method (e.g., WebDAV PROPFIND)
+# Any HTTP method works - that's why we have custom methods
 response = await crawlpy.request('PROPFIND', 'https://webdav.example.com/files')
-
-# Custom method with query parameters
-params = {'query': 'python'}
-response = await crawlpy.request('SEARCH', 'https://api.example.com/search', params=params)
-
-# Custom method with headers and JSON body
-headers = {'Authorization': 'Bearer token'}
-json = {'filters': {'active': True}}
-response = await crawlpy.request('SEARCH', 'https://api.example.com/search', 
-                                headers=headers, json=json)
+response = await crawlpy.request('SEARCH', 'https://api.example.com/search', params=query)
+response = await crawlpy.request('LOCK', 'https://webdav.example.com/file', json=lock)
 ```
 
-## Configuration Classes
+## Configuration
 
-### Redirects
-```python
-from crawlpy import Redirects
-
-# Follow up to 5 redirects (default is usually 30)
-redirects = Redirects(follow=True, limit=5)
-response = await crawlpy.get('https://example.com/redirect', redirects=redirects)
-
-# Disable automatic redirect following
-redirects = Redirects(follow=False)
-response = await crawlpy.get('https://example.com/redirect', redirects=redirects)
-```
+Configure timeouts, retries, redirects, and connection limits with simple classes:
 
 ### Timeouts
 ```python
 from crawlpy import Timeout
 
-# Simple timeout in seconds (applies to entire request)
+# Simple timeout
 response = await crawlpy.get('https://example.com', timeout=10.0)
 
-# Detailed timeout configuration for different phases
-timeout = Timeout(
-    connect=5.0,    # Time to establish connection
-    read=30.0,      # Time to read response data
-    write=10.0,     # Time to send request data
-    pool=60.0       # Time to get connection from pool
-)
+# Detailed timeout control
+timeout = Timeout(connect=5.0, read=30.0, write=10.0, pool=60.0)
 response = await crawlpy.get('https://example.com', timeout=timeout)
 ```
 
-### Retry Logic
+### Retries
 ```python
 from crawlpy import Retry
 
-# Basic retry configuration (retry up to 3 times)
+# Basic retry
 retry = Retry(total=3)
 response = await crawlpy.get('https://example.com', retry=retry)
 
-# Advanced retry with exponential backoff
-retry = Retry(
-    total=5,                        # Maximum retry attempts
-    backoff=1.5,                   # Backoff multiplier (1.5^attempt seconds)
-    status=[500, 502, 503, 504]    # Only retry on these HTTP status codes
-)
+# Smart retry with backoff
+retry = Retry(total=5, backoff=1.5, status=[500, 502, 503, 504])
 response = await crawlpy.get('https://example.com', retry=retry)
 ```
 
-### Connection Limits
+### Redirects and Limits
 ```python
-from crawlpy import Limits
+from crawlpy import Redirects, Limits
 
-# Global connection pool limits
-limits = Limits(
-    connections=50,    # Total connections across all hosts
-    keepalive=10      # Keep-alive connections to maintain
-)
-response = await crawlpy.get('https://example.com', limits=limits)
+# Control redirects
+redirects = Redirects(follow=True, limit=5)
+response = await crawlpy.get('https://example.com', redirects=redirects)
 
-# Per-host connection limits
-limits = Limits(
-    connections=100,   # Total connections
-    host=20           # Max connections per host
-)
+# Connection pool limits
+limits = Limits(connections=50, keepalive=10, host=20)
 response = await crawlpy.get('https://example.com', limits=limits)
 ```
 
 ## Response Handling
 
+Everything you need from HTTP responses in one clean interface:
+
 ```python
 response = await crawlpy.get('https://httpbin.org/json')
 
-# Status information
-print(response.status)          # HTTP status code (e.g., 200)
-print(response.reason)          # Status reason phrase (e.g., 'OK')
-print(response.url)             # Final URL after any redirects
-print(response.elapsed)         # Total request duration
+# Status and metadata
+print(response.status)      # 200
+print(response.reason)      # 'OK'
+print(response.url)         # Final URL after redirects
+print(response.elapsed)     # Request duration
 
-# Content access methods
-print(response.text)            # Response body as string
-print(response.content)         # Response body as raw bytes
-print(response.json())          # Parse JSON response to Python dict/list
-print(response.headers)         # Response headers as dict-like object
-print(response.type)            # Content-Type header value
+# Content in multiple formats
+print(response.text)        # String
+print(response.content)     # Raw bytes
+print(response.json())      # Parsed JSON
+print(response.headers)     # Headers dict
+print(response.type)        # Content-Type
 ```
 
 ## Sessions
 
-Sessions maintain state across multiple requests and provide better performance through connection reuse:
+Sessions maintain state and improve performance through connection reuse:
 
-### Basic Session
 ```python
 from crawlpy import Session
 
 async with Session() as session:
-    # Set headers that will be used for all requests in this session
+    # Set headers for all requests in this session
     session.headers.update({'User-Agent': 'MyApp/1.0'})
     
-    # All requests in this session share the same connection pool and headers
+    # Reuse connections automatically
     user = await session.get('https://api.example.com/user')
     data = await session.get('https://api.example.com/data')
-    # Connection is automatically reused between requests
 ```
 
-### Configured Session
+### Configured Sessions
 ```python
-from crawlpy import Session, Timeout, Retry, Limits
-
-# Create session with default configuration for all requests
+# Session with default configuration
 session = Session(
-    timeout=Timeout(connect=5.0, read=30.0),    # Default timeouts
-    retry=Retry(total=3, backoff=2.0),          # Default retry behavior
-    limits=Limits(connections=100, keepalive=20) # Connection pool settings
+    timeout=Timeout(connect=5.0, read=30.0),
+    retry=Retry(total=3, backoff=2.0),
+    limits=Limits(connections=100, keepalive=20)
 )
 
 async with session:
-    # All requests use the session's default configuration
     response = await session.get('https://api.example.com/data')
 ```
 
 ### Prepared Requests
 ```python
-from crawlpy import Session, Request
-
 async with Session() as session:
-    # Create a reusable request template
-    request = Request(
+    # Create reusable request template
+    request = session.build(
         method='POST',
         url='https://api.example.com/data',
         headers={'Authorization': 'Bearer token'},
         json={'key': 'value'}
     )
     
-    # Prepare the request (validates and processes it)
-    prepared = session.prepare(request)
-    
-    # Send the prepared request (can be reused multiple times)
-    response = await session.send(prepared)
+    # Prepare and send
+    ready = session.prepare(request)
+    response = await session.send(ready)
 ```
 
-## Cookie Management
+## Cookies
+
+Simple cookie management that works automatically:
 
 ```python
 from crawlpy import Cookies
 
-# Create a cookie jar to store and manage cookies
 cookies = Cookies()
-
-# Set cookies manually
 cookies.set('session', 'abc123', domain='example.com')
-cookies.set('theme', 'dark', domain='example.com', path='/app')
 
-# Use cookies with requests (automatically sent with matching domain/path)
+# Cookies are automatically sent with matching requests
 response = await crawlpy.get('https://example.com', cookies=cookies)
 
-# Access cookies from response (automatically stored in jar if provided)
-response_cookies = response.cookies
-auth_token = response_cookies.get('auth_token')
+# Access response cookies
+token = response.cookies.get('token')
 ```
 
 ## Request/Response Hooks
 
-Process requests before sending and responses after receiving:
+Transform requests before sending and responses after receiving with simple functions:
 
-### Request Hooks
 ```python
-# Function to add forwarding headers
-def forwarded(request):
-    request.headers['X-Forwarded-For'] = '192.168.1.1'
+# Define what you want to do
+def key(request):
+    request.headers['X-API-Key'] = 'your-secret-key'
     return request
 
-# Function to add user agent
-def agent(request):
-    request.headers['User-Agent'] = 'CrawlPy/1.0'
-    return request
-```
-
-### Response Hooks
-```python
-# Function to log response details
-def logging(response):
-    print(f"Status: {response.status} for {response.url}")
+def log(response):
+    print(f"Got {response.status} from {response.url}")
     return response
 
-# Function to handle response checking
-def check(response):
-    if response.status >= 400:
-        print(f"Warning: HTTP {response.status} error")
-    return response
-```
-
-### Using Hooks
-```python
-from crawlpy import Session
-
-async with Session() as client:
-    # Add hooks to session (applied to all requests)
-    client['before'].append(forwarded)
-    client['before'].append(useragent)
-    client['after'].append(logging)
-    client['after'].append(validate)
-    
-    # Hooks are automatically applied
-    response = await client.get('https://api.example.com/data')
-
-# Or apply hooks to individual requests only
+# Apply to individual requests
 response = await crawlpy.get(
     'https://api.example.com/data',
-    before=[forwarded, useragent],
-    after=[logging, validate]
+    before=[key],
+    after=[log]
 )
+
+# Or apply to all requests in a session
+async with Session() as client:
+    client.before.append(key)
+    client.after.append(log)
+    
+    # Hooks run automatically on every request
+    response = await client.get('https://api.example.com/data')
 ```
 
 ## Proxy Support
 
+Configure HTTP/HTTPS proxies with optional authentication:
+
 ```python
 from crawlpy import Proxy
 
-# Configure HTTP proxy with authentication
 proxy = Proxy(
     host='proxy.example.com',
     port=8080,
-    username='user',           # Optional: proxy username
-    password='pass',           # Optional: proxy password
-    scheme='http'              # http or https
+    username='user',    # Optional
+    password='pass',    # Optional
+    scheme='http'
 )
 
-# Use proxy for requests
 response = await crawlpy.get('https://example.com', proxy=proxy)
 ```
 
 ## SSL Configuration
 
+Custom SSL contexts for specific security requirements:
+
 ```python
 import ssl
 
-# Create custom SSL context for specific requirements
+# Custom SSL context
 context = ssl.create_default_context()
-context.check_hostname = False              # Disable hostname verification
-context.verify_mode = ssl.CERT_REQUIRED     # Require valid certificates
+context.check_hostname = False
+context.verify_mode = ssl.CERT_REQUIRED
 
 response = await crawlpy.get('https://example.com', context=context)
 
-# Configure client certificates for mutual TLS
+# Client certificates for mutual TLS
 context = ssl.create_default_context()
 context.load_cert_chain('/path/to/cert.pem', '/path/to/key.pem')
 response = await crawlpy.get('https://example.com', context=context)
@@ -365,7 +278,7 @@ response = await crawlpy.get('https://example.com', context=context)
 
 ## Error Handling
 
-CrawlPy provides specific exception types for different error conditions:
+Specific exceptions for different error conditions make debugging easier:
 
 ```python
 from crawlpy import (
@@ -375,62 +288,20 @@ from crawlpy import (
 
 try:
     response = await crawlpy.get('https://example.com/api')
-    # Raise exception for 4xx/5xx status codes
-    response.raise_for_status()
+    response.raise_for_status()  # Raises HTTPError for 4xx/5xx
     
 except HTTPError as error:
-    # Handle HTTP errors (4xx, 5xx status codes)
     print(f"HTTP error {error.response.status}: {error}")
     
 except TimeoutError as error:
-    # Handle request timeouts
     print(f"Request timed out: {error}")
     
 except ConnectionError as error:
-    # Handle connection failures (network issues, DNS resolution, etc.)
     print(f"Connection failed: {error}")
     
 except SSLError as error:
-    # Handle SSL/TLS certificate errors
     print(f"SSL/TLS error: {error}")
     
 except RequestError as error:
-    # Handle general request errors
     print(f"Request error: {error}")
 ```
-
-## API Reference
-
-### Main Functions
-- `crawlpy.get(url, **kwargs)` - GET request
-- `crawlpy.post(url, **kwargs)` - POST request  
-- `crawlpy.put(url, **kwargs)` - PUT request
-- `crawlpy.patch(url, **kwargs)` - PATCH request
-- `crawlpy.delete(url, **kwargs)` - DELETE request
-- `crawlpy.head(url, **kwargs)` - HEAD request
-- `crawlpy.options(url, **kwargs)` - OPTIONS request
-- `crawlpy.request(method, url, **kwargs)` - Custom request
-
-### Configuration Classes
-- `Session(**kwargs)` - HTTP session
-- `Timeout(**kwargs)` - Timeout configuration
-- `Retry(**kwargs)` - Retry logic
-- `Redirects(**kwargs)` - Redirect handling
-- `Limits(**kwargs)` - Connection limits
-- `Cookies()` - Cookie management
-- `Proxy(**kwargs)` - Proxy configuration
-
-### Common Parameters
-- `url` - Target URL
-- `params` - Query parameters (dict)
-- `headers` - HTTP headers (dict)
-- `json` - JSON data to send
-- `data` - Form data to send
-- `files` - Files to upload
-- `timeout` - Request timeout
-- `retry` - Retry configuration
-- `redirects` - Redirect handling
-- `cookies` - Cookie jar
-- `proxy` - Proxy settings
-- `before` - Request hook functions
-- `after` - Response hook functions
