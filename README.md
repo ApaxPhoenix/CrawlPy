@@ -191,7 +191,7 @@ async with Session() as session:
     response = await session.send(ready)
 ```
 
-## Cookies
+## Request/Response Hooks
 
 Simple cookie management that works automatically:
 
@@ -208,7 +208,51 @@ response = await crawlpy.get('https://example.com', cookies=cookies)
 token = response.cookies.get('token')
 ```
 
-## Request/Response Hooks
+## Streaming
+
+Handle large files and responses without loading everything into memory:
+
+```python
+# Download large files in chunks
+async with crawlpy.stream('GET', 'https://example.com/large-file.zip') as response:
+    with open('large-file.zip', 'wb') as file:
+        async for chunk in response.chunks():
+            file.write(chunk)
+
+# Process streaming JSON line by line
+async with crawlpy.stream('GET', 'https://api.example.com/events') as response:
+    async for line in response.lines():
+        event = json.loads(line)
+        print(f"Event: {event['type']}")
+
+# Upload large files with streaming
+async with crawlpy.stream('POST', 'https://api.example.com/upload') as stream:
+    with open('huge-file.dat', 'rb') as file:
+        await stream.write(file.read())
+    response = await stream.response()
+```
+
+## Authentication
+
+Clean authentication handling for common patterns:
+
+```python
+from crawlpy import BasicAuth, Bearer, ApiKey
+
+# Basic authentication
+auth = BasicAuth('user', 'pass')
+response = await crawlpy.get('https://api.example.com', auth=auth)
+
+# Bearer token
+auth = Bearer('token123')
+response = await crawlpy.get('https://api.example.com', auth=auth)
+
+# API key in header
+auth = ApiKey('secret-key', 'X-API-Key')
+response = await crawlpy.get('https://api.example.com', auth=auth)
+```
+
+
 
 Transform requests before sending and responses after receiving with simple functions:
 
@@ -218,21 +262,22 @@ def key(request):
     request.headers['X-API-Key'] = 'your-secret-key'
     return request
 
-def log(response):
-    print(f"Got {response.status} from {response.url}")
+def cache(response):
+    if response.status == 200:
+        response.cache = True
     return response
 
 # Apply to individual requests
 response = await crawlpy.get(
     'https://api.example.com/data',
     before=[key],
-    after=[log]
+    after=[cache]
 )
 
 # Or apply to all requests in a session
 async with Session() as client:
     client.before.append(key)
-    client.after.append(log)
+    client.after.append(cache)
     
     # Hooks run automatically on every request
     response = await client.get('https://api.example.com/data')
