@@ -1,8 +1,20 @@
 # CrawlPy
 
-**Modern Async HTTP Client Library for Python**
+**CrawlPy** is a modern asynchronous HTTP client library designed to simplify web requests in Python. Whether you're building a web scraper, consuming APIs, or handling HTTP communication, CrawlPy provides the tools you need to get the job done efficiently. This documentation will guide you through the core features, configuration options, and essential functionalities of CrawlPy.
 
-CrawlPy is a high-performance asynchronous HTTP client library that provides a clean, intuitive interface for making HTTP requests with full async/await support.
+## Core Features
+
+CrawlPy offers a comprehensive set of features for modern HTTP communication:
+
+- **Async/Await Support** - Native asynchronous programming with full async/await syntax
+- **Smart Session Management** - Automatic connection pooling and state persistence
+- **Flexible Authentication** - Built-in support for Bearer, Basic, and custom auth methods
+- **Streaming Support** - Handle large files and responses without memory overhead
+- **Retry Logic** - Intelligent retry mechanisms with exponential backoff
+- **Timeout Control** - Granular timeout configuration for different operations
+- **Cookie Management** - Automatic cookie handling and persistence
+- **Proxy Support** - HTTP/HTTPS proxy configuration with authentication
+- **SSL Configuration** - Custom SSL contexts and certificate handling
 
 ## Installation
 
@@ -11,6 +23,8 @@ pip install crawlpy
 ```
 
 ## Quick Start
+
+Get started with CrawlPy in just a few lines of code:
 
 ```python
 import asyncio
@@ -26,9 +40,9 @@ asyncio.run(main())
 
 ## HTTP Methods
 
-All the standard HTTP methods you'd expect, with clean async/await syntax:
+CrawlPy supports all standard HTTP methods with clean, intuitive syntax:
 
-### GET - Retrieve Data
+### GET Requests
 ```python
 # Basic GET request
 response = await crawlpy.get('https://example.com/users')
@@ -42,7 +56,7 @@ headers = {'Accept': 'application/json'}
 response = await crawlpy.get('https://example.com/profile', headers=headers)
 ```
 
-### POST - Create Resources
+### POST Requests
 ```python
 # JSON data (automatically sets Content-Type)
 data = {'name': 'Alice', 'email': 'alice@example.com'}
@@ -57,7 +71,7 @@ files = {'document': open('report.pdf', 'rb')}
 response = await crawlpy.post('https://example.com/upload', files=files)
 ```
 
-### PUT, PATCH, DELETE, HEAD, OPTIONS
+### Other HTTP Methods
 ```python
 # Replace entire resource
 response = await crawlpy.put('https://example.com/users/1', json=user)
@@ -71,23 +85,15 @@ response = await crawlpy.delete('https://example.com/users/123')
 # Get headers only
 response = await crawlpy.head('https://cdn.example.com/large-file.zip')
 
-# Discover capabilities
-response = await crawlpy.options('https://example.com/users')
-```
-
-### Custom Methods
-```python
-# Any HTTP method works - that's why we have custom methods
+# Custom methods
 response = await crawlpy.request('PROPFIND', 'https://webdav.example.com/files')
-response = await crawlpy.request('SEARCH', 'https://example.com/search', params=query)
-response = await crawlpy.request('LOCK', 'https://webdav.example.com/file', json=lock)
 ```
 
 ## Configuration
 
-Configure timeouts, retries, redirects, and connection limits with simple classes:
+Configure CrawlPy behavior with simple, powerful configuration classes:
 
-### Timeouts
+### Timeout Configuration
 ```python
 from crawlpy import Timeout
 
@@ -99,7 +105,7 @@ timeout = Timeout(connect=5.0, read=30.0, write=10.0, pool=60.0)
 response = await crawlpy.get('https://example.com', timeout=timeout)
 ```
 
-### Retries
+### Retry Configuration
 ```python
 from crawlpy import Retry
 
@@ -112,44 +118,20 @@ retry = Retry(total=5, backoff=1.5, status=[500, 502, 503, 504])
 response = await crawlpy.get('https://example.com', retry=retry)
 ```
 
-### Redirects and Limits
+### Connection Limits
 ```python
-from crawlpy import Redirects, Limits
-
-# Control redirects
-redirects = Redirects(follow=True, limit=5)
-response = await crawlpy.get('https://example.com', redirects=redirects)
+from crawlpy import Limits
 
 # Connection pool limits
 limits = Limits(connections=50, keepalive=10, host=20)
 response = await crawlpy.get('https://example.com', limits=limits)
 ```
 
-## Response Handling
+## Session Management
 
-Everything you need from HTTP responses in one clean interface:
+Sessions provide connection reuse and state persistence for improved performance:
 
-```python
-response = await crawlpy.get('https://httpbin.org/json')
-
-# Status and metadata
-print(response.status)      # 200
-print(response.reason)      # 'OK'
-print(response.url)         # Final URL after redirects
-print(response.elapsed)     # Request duration
-
-# Content in multiple formats
-print(response.text)        # String
-print(response.content)     # Raw bytes
-print(response.json())      # Parsed JSON
-print(response.headers)     # Headers dict
-print(response.type)        # Content-Type
-```
-
-## Sessions
-
-Sessions maintain state and improve performance through connection reuse:
-
+### Basic Session Usage
 ```python
 from crawlpy import Session
 
@@ -175,25 +157,80 @@ async with session:
     response = await session.get('https://example.com/data')
 ```
 
-### Prepared Requests
+## Authentication
+
+Clean authentication handling for common patterns:
+
+### Basic Authentication
 ```python
-async with Session() as session:
-    # Create reusable request template
-    request = session.build(
-        method='POST',
-        url='https://example.com/data',
-        headers={'Authorization': 'Bearer token'},
-        json={'key': 'value'}
-    )
-    
-    # Prepare and send
-    ready = session.prepare(request)
-    response = await session.send(ready)
+from crawlpy import BasicAuth
+
+auth = BasicAuth('user', 'pass')
+response = await crawlpy.get('https://example.com', auth=auth)
+```
+
+### Token Authentication
+```python
+from crawlpy import Bearer
+
+auth = Bearer('token123')
+response = await crawlpy.get('https://example.com', auth=auth)
+```
+
+### Custom Authentication
+```python
+from crawlpy import ApiKey
+
+auth = ApiKey('secret-key', 'X-Custom-Key')
+response = await crawlpy.get('https://example.com', auth=auth)
+```
+
+## Response Handling
+
+Access response data through a clean, consistent interface:
+
+```python
+response = await crawlpy.get('https://httpbin.org/json')
+
+# Status and metadata
+print(response.status)      # 200
+print(response.reason)      # 'OK'
+print(response.url)         # Final URL after redirects
+print(response.elapsed)     # Request duration
+
+# Content in multiple formats
+print(response.text)        # String
+print(response.content)     # Raw bytes
+print(response.json())      # Parsed JSON
+print(response.headers)     # Headers dict
+print(response.type)        # Content-Type
+```
+
+## Streaming
+
+Handle large files and responses without loading everything into memory:
+
+### Download Streaming
+```python
+# Download large files in chunks
+async with crawlpy.stream('GET', 'https://example.com/large-file.zip') as response:
+    with open('large-file.zip', 'wb') as file:
+        async for chunk in response.chunks():
+            file.write(chunk)
+```
+
+### Upload Streaming
+```python
+# Upload large files with streaming
+async with crawlpy.stream('POST', 'https://example.com/upload') as stream:
+    with open('huge-file.dat', 'rb') as file:
+        await stream.write(file.read())
+    response = await stream.response()
 ```
 
 ## Cookie Management
 
-Simple cookie management that works automatically:
+Automatic cookie handling that works seamlessly:
 
 ```python
 from crawlpy import Cookies
@@ -206,81 +243,6 @@ response = await crawlpy.get('https://example.com', cookies=cookies)
 
 # Access response cookies
 token = response.cookies.get('token')
-```
-
-## Streaming
-
-Handle large files and responses without loading everything into memory:
-
-```python
-# Download large files in chunks
-async with crawlpy.stream('GET', 'https://example.com/large-file.zip') as response:
-    with open('large-file.zip', 'wb') as file:
-        async for chunk in response.chunks():
-            file.write(chunk)
-
-# Process streaming JSON line by line
-async with crawlpy.stream('GET', 'https://example.com/events') as response:
-    async for line in response.lines():
-        event = json.loads(line)
-        print(f"Event: {event['type']}")
-
-# Upload large files with streaming
-async with crawlpy.stream('POST', 'https://example.com/upload') as stream:
-    with open('huge-file.dat', 'rb') as file:
-        await stream.write(file.read())
-    response = await stream.response()
-```
-
-## Authentication
-
-Clean authentication handling for common patterns:
-
-```python
-from crawlpy import BasicAuth, Bearer, ApiKey
-
-# Basic authentication
-auth = BasicAuth('user', 'pass')
-response = await crawlpy.get('https://example.com', auth=auth)
-
-# Bearer token
-auth = Bearer('token123')
-response = await crawlpy.get('https://example.com', auth=auth)
-
-# Custom header authentication
-auth = ApiKey('secret-key', 'X-Custom-Key')
-response = await crawlpy.get('https://example.com', auth=auth)
-```
-
-## Request/Response Hooks
-
-Transform requests before sending and responses after receiving with simple functions:
-
-```python
-# Define what you want to do
-def authenticate(request):
-    request.headers['X-Auth-Key'] = 'your-secret-key'
-    return request
-
-def cache(response):
-    if response.status == 200:
-        response.cache = True
-    return response
-
-# Apply to individual requests
-response = await crawlpy.get(
-    'https://example.com/data',
-    before=[authenticate],
-    after=[cache]
-)
-
-# Or apply to all requests in a session
-async with Session() as client:
-    client.before.append(authenticate)
-    client.after.append(cache)
-    
-    # Hooks run automatically on every request
-    response = await client.get('https://example.com/data')
 ```
 
 ## Proxy Support
@@ -301,29 +263,9 @@ proxy = Proxy(
 response = await crawlpy.get('https://example.com', proxy=proxy)
 ```
 
-## SSL Configuration
-
-Custom SSL contexts for specific security requirements:
-
-```python
-import ssl
-
-# Custom SSL context
-context = ssl.create_default_context()
-context.check_hostname = False
-context.verify_mode = ssl.CERT_REQUIRED
-
-response = await crawlpy.get('https://example.com', context=context)
-
-# Client certificates for mutual TLS
-context = ssl.create_default_context()
-context.load_cert_chain('/path/to/cert.pem', '/path/to/key.pem')
-response = await crawlpy.get('https://example.com', context=context)
-```
-
 ## Error Handling
 
-Specific exceptions for different error conditions make debugging easier:
+Comprehensive error handling with specific exception types:
 
 ```python
 from crawlpy import (
@@ -344,9 +286,42 @@ except TimeoutError as error:
 except ConnectionError as error:
     print(f"Connection failed: {error}")
     
-except SSLError as error:
-    print(f"SSL/TLS error: {error}")
-    
 except RequestError as error:
     print(f"Request error: {error}")
 ```
+
+## Advanced Features
+
+### Request/Response Hooks
+```python
+# Transform requests and responses
+def authenticate(request):
+    request.headers['X-Auth-Key'] = 'your-secret-key'
+    return request
+
+def cache(response):
+    if response.status == 200:
+        response.cache = True
+    return response
+
+# Apply hooks to requests
+response = await crawlpy.get(
+    'https://example.com/data',
+    before=[authenticate],
+    after=[cache]
+)
+```
+
+### SSL Configuration
+```python
+import ssl
+
+# Custom SSL context
+context = ssl.create_default_context()
+context.check_hostname = False
+context.verify_mode = ssl.CERT_REQUIRED
+
+response = await crawlpy.get('https://example.com', context=context)
+```
+
+CrawlPy provides everything you need for modern HTTP communication in Python, with a focus on simplicity, performance, and flexibility.
