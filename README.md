@@ -31,55 +31,55 @@ All the standard HTTP methods you'd expect, with clean async/await syntax:
 ### GET - Retrieve Data
 ```python
 # Basic GET request
-response = await crawlpy.get('https://api.example.com/users')
+response = await crawlpy.get('https://example.com/users')
 
 # With query parameters
 params = {'page': 1, 'limit': 10}
-response = await crawlpy.get('https://api.example.com/users', params=params)
+response = await crawlpy.get('https://example.com/users', params=params)
 
 # With custom headers
-headers = {'X-API-Key': 'your-api-key', 'Accept': 'application/json'}
-response = await crawlpy.get('https://api.example.com/profile', headers=headers)
+headers = {'Accept': 'application/json'}
+response = await crawlpy.get('https://example.com/profile', headers=headers)
 ```
 
 ### POST - Create Resources
 ```python
 # JSON data (automatically sets Content-Type)
-json = {'name': 'Alice', 'email': 'alice@example.com'}
-response = await crawlpy.post('https://api.example.com/users', json=json)
+data = {'name': 'Alice', 'email': 'alice@example.com'}
+response = await crawlpy.post('https://example.com/users', json=data)
 
 # Form data
 data = {'username': 'alice', 'password': 'secret'}
-response = await crawlpy.post('https://api.example.com/login', data=data)
+response = await crawlpy.post('https://example.com/login', data=data)
 
 # File upload
 files = {'document': open('report.pdf', 'rb')}
-response = await crawlpy.post('https://api.example.com/upload', files=files)
+response = await crawlpy.post('https://example.com/upload', files=files)
 ```
 
 ### PUT, PATCH, DELETE, HEAD, OPTIONS
 ```python
 # Replace entire resource
-response = await crawlpy.put('https://api.example.com/users/1', json=user)
+response = await crawlpy.put('https://example.com/users/1', json=user)
 
 # Partial update
-response = await crawlpy.patch('https://api.example.com/tasks/789', json={'status': 'done'})
+response = await crawlpy.patch('https://example.com/tasks/789', json={'status': 'done'})
 
 # Delete resource
-response = await crawlpy.delete('https://api.example.com/users/123')
+response = await crawlpy.delete('https://example.com/users/123')
 
 # Get headers only
 response = await crawlpy.head('https://cdn.example.com/large-file.zip')
 
 # Discover capabilities
-response = await crawlpy.options('https://api.example.com/users')
+response = await crawlpy.options('https://example.com/users')
 ```
 
 ### Custom Methods
 ```python
 # Any HTTP method works - that's why we have custom methods
 response = await crawlpy.request('PROPFIND', 'https://webdav.example.com/files')
-response = await crawlpy.request('SEARCH', 'https://api.example.com/search', params=query)
+response = await crawlpy.request('SEARCH', 'https://example.com/search', params=query)
 response = await crawlpy.request('LOCK', 'https://webdav.example.com/file', json=lock)
 ```
 
@@ -158,8 +158,8 @@ async with Session() as session:
     session.headers.update({'User-Agent': 'MyApp/1.0'})
     
     # Reuse connections automatically
-    user = await session.get('https://api.example.com/user')
-    data = await session.get('https://api.example.com/data')
+    user = await session.get('https://example.com/user')
+    data = await session.get('https://example.com/data')
 ```
 
 ### Configured Sessions
@@ -172,7 +172,7 @@ session = Session(
 )
 
 async with session:
-    response = await session.get('https://api.example.com/data')
+    response = await session.get('https://example.com/data')
 ```
 
 ### Prepared Requests
@@ -181,7 +181,7 @@ async with Session() as session:
     # Create reusable request template
     request = session.build(
         method='POST',
-        url='https://api.example.com/data',
+        url='https://example.com/data',
         headers={'Authorization': 'Bearer token'},
         json={'key': 'value'}
     )
@@ -191,7 +191,7 @@ async with Session() as session:
     response = await session.send(ready)
 ```
 
-## Request/Response Hooks
+## Cookie Management
 
 Simple cookie management that works automatically:
 
@@ -220,13 +220,13 @@ async with crawlpy.stream('GET', 'https://example.com/large-file.zip') as respon
             file.write(chunk)
 
 # Process streaming JSON line by line
-async with crawlpy.stream('GET', 'https://api.example.com/events') as response:
+async with crawlpy.stream('GET', 'https://example.com/events') as response:
     async for line in response.lines():
         event = json.loads(line)
         print(f"Event: {event['type']}")
 
 # Upload large files with streaming
-async with crawlpy.stream('POST', 'https://api.example.com/upload') as stream:
+async with crawlpy.stream('POST', 'https://example.com/upload') as stream:
     with open('huge-file.dat', 'rb') as file:
         await stream.write(file.read())
     response = await stream.response()
@@ -241,25 +241,25 @@ from crawlpy import BasicAuth, Bearer, ApiKey
 
 # Basic authentication
 auth = BasicAuth('user', 'pass')
-response = await crawlpy.get('https://api.example.com', auth=auth)
+response = await crawlpy.get('https://example.com', auth=auth)
 
 # Bearer token
 auth = Bearer('token123')
-response = await crawlpy.get('https://api.example.com', auth=auth)
+response = await crawlpy.get('https://example.com', auth=auth)
 
-# API key in header
-auth = ApiKey('secret-key', 'X-API-Key')
-response = await crawlpy.get('https://api.example.com', auth=auth)
+# Custom header authentication
+auth = ApiKey('secret-key', 'X-Custom-Key')
+response = await crawlpy.get('https://example.com', auth=auth)
 ```
 
-
+## Request/Response Hooks
 
 Transform requests before sending and responses after receiving with simple functions:
 
 ```python
 # Define what you want to do
-def key(request):
-    request.headers['X-API-Key'] = 'your-secret-key'
+def authenticate(request):
+    request.headers['X-Auth-Key'] = 'your-secret-key'
     return request
 
 def cache(response):
@@ -269,18 +269,18 @@ def cache(response):
 
 # Apply to individual requests
 response = await crawlpy.get(
-    'https://api.example.com/data',
-    before=[key],
+    'https://example.com/data',
+    before=[authenticate],
     after=[cache]
 )
 
 # Or apply to all requests in a session
 async with Session() as client:
-    client.before.append(key)
+    client.before.append(authenticate)
     client.after.append(cache)
     
     # Hooks run automatically on every request
-    response = await client.get('https://api.example.com/data')
+    response = await client.get('https://example.com/data')
 ```
 
 ## Proxy Support
@@ -332,7 +332,7 @@ from crawlpy import (
 )
 
 try:
-    response = await crawlpy.get('https://example.com/api')
+    response = await crawlpy.get('https://example.com/data')
     response.raise_for_status()  # Raises HTTPError for 4xx/5xx
     
 except HTTPError as error:
