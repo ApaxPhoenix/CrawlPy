@@ -1,111 +1,563 @@
 import aiohttp
+import asyncio
 import warnings
-from typing import Optional, Dict, Any
+import itertools
+from typing import Optional, Dict, Any, Union, List
 from urllib.parse import urlparse
+from config import Limits, Retry, Timeout, Redirects
+from broadcast import Response, Stream
+from settings import SSL, Proxy
 
 
 class CrawlCore:
-    def __init__(self, endpoint: str, duration: Optional[float] = 10,
-                 proxy: Optional[Dict] = None, ssl: Optional[bool] = None,
-                 cookies: Optional[aiohttp.CookieJar] = None) -> None:
+    """
+    Asynchronous HTTP client for making web requests with comprehensive error handling,
+    proxy rotation, and SSL support.
+
+    This class provides a high-level interface for making HTTP requests using aiohttp.
+    It supports all standard HTTP methods, file uploads, streaming, redirect handling,
+    proxy rotation, SSL configuration, and proper session management through async context managers.
+    """
+
+    def __init__(self, endpoint: str, limits: Optional[Limits] = None,
+                 timeout: Optional[Timeout] = None, retry: Optional[Retry] = None,
+                 redirects: Optional[Redirects] = None, proxies: Optional[Union[Proxy, List[Proxy]]] = None,
+                 ssl: Optional[SSL] = None) -> None:
         """
-        Initialize the HTTP client with an endpoint, timeout, and optional proxy settings, SSL, and cookie jar.
+        Initialize the HTTP client with a base endpoint URL and configuration.
 
         Args:
-            endpoint (str): The full URL for the HTTP connection, including the protocol (http/https)
-            duration (Optional[float]): Connection timeout in seconds, default is 10 seconds
-            proxy (Optional[Dict]): Proxy configuration, default is None
-            ssl (Optional[bool]): SSL verification configuration, default is None
-            cookies (Optional[aiohttp.CookieJar]): Cookie jar configuration, default is None
+            endpoint: The base URL for HTTP requests (must include http:// or https://)
+            limits: Connection limits configuration
+            timeout: Default timeout configuration
+            retry: Default retry configuration
+            redirects: Redirect handling configuration
+            proxies: Single proxy or list of proxies for rotation
+            ssl: SSL/TLS configuration
 
         Raises:
-            ValueError: If endpoint doesn't start with 'http' or 'https'
-            ValueError: If duration is negative
+            TypeError: If endpoint is not a string
+            ValueError: If endpoint doesn't start with http:// or https://
         """
+        # Validate endpoint parameter type
         if not isinstance(endpoint, str):
             raise TypeError("Endpoint must be a string.")
+
+        # Validate endpoint URL scheme
         if not urlparse(endpoint).scheme in {'http', 'https'}:
             raise ValueError("Endpoint must start with 'http' or 'https'.")
-        if not isinstance(duration, (int, float)) or duration <= 0:
-            raise ValueError("Duration must be a positive number.")
-        if proxy and not isinstance(proxy, dict):
-            raise TypeError("Proxy must be a dictionary or None.")
-        if cookies and not isinstance(cookies, aiohttp.CookieJar):
-            raise TypeError("Cookies must be an instance of aiohttp.CookieJar or None.")
 
+        # Store configuration with matching variable names
         self.endpoint = endpoint
-        self.duration = duration
-        self.proxy = proxy
-        self.ssl = ssl
-        self.cookies = cookies
+        self.limits = limits or Limits()
+        self.timeout = timeout or Timeout()
+        self.retry = retry or Retry()
+        self.redirects = redirects or Redirects()
+        self.ssl = ssl or SSL()
+
+        # Handle proxy configuration
+        if proxies is None:
+            self.proxies = []
+        elif isinstance(proxies, Proxy):
+            self.proxies = [proxies]
+        else:
+            self.proxies = proxies
+
+        # Initialize proxy rotation cycle
+        self.cycle = itertools.cycle(self.proxies) if self.proxies else None
+        self.proxy: Optional[Proxy] = None
+
+        # Initialize session as None - will be created in __aenter__
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self) -> "CrawlCore":
         """
-        Asynchronously enters the context for managing the HTTP client session.
+        Asynchronously enter the context manager and initialize the HTTP session.
 
-        Sets up an HTTP session using aiohttp.ClientSession with proper configuration (including proxy, SSL, and cookies).
+        This method sets up the aiohttp ClientSession for making requests.
+        The session manages connection pooling, cookies, and other HTTP features.
 
         Returns:
-            CrawlCore: The instance of the CrawlCore HTTP client.
-        """
-        if not self.session:
-            parse = urlparse(self.endpoint)
-            protocol = parse.scheme.lower()
+            CrawlCore: The initialized CrawlCore instance
 
-            if protocol not in ['http', 'https']:
+        Raises:
+            ValueError: If the endpoint protocol is not HTTP or HTTPS
+        """
+        # Only create session if it doesn't exist
+        if not self.session:
+            # Parse the endpoint URL to extract scheme
+            parsed = urlparse(self.endpoint)
+            scheme = parsed.scheme.lower()
+
+            # Validate protocol scheme
+            if scheme not in ['http', 'https']:
                 raise ValueError("Only HTTP and HTTPS protocols are supported.")
 
-            connector = aiohttp.TCPConnector(ssl=self.ssl if self.ssl is not None else protocol == 'https')
+            # Create TCP connector with connection limits and SSL configuration
+            connector = aiohttp.TCPConnector(
+                limit=self.limits.connections,
+                limit_per_host=self.limits.host,
+                keepalive_timeout=self.limits.keepalive,
+                ssl=self.ssl.context
+            )
 
-            # Create a new aiohttp session with the provided cookie jar
+            # Create HTTP session with connector and default timeout
             self.session = aiohttp.ClientSession(
                 connector=connector,
-                trust_env=False,
-                cookie_jar=self.cookies
+                timeout=self.timeout.convert()
             )
 
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
         """
-        Asynchronously exits the context and closes the session.
+        Asynchronously exit the context manager and clean up the HTTP session.
+
+        This method properly closes the aiohttp ClientSession and releases
+        any associated resources like connection pools and file handles.
 
         Args:
-            exc_type (type): Exception type, if any
-            exc_val (Exception): Exception value, if any
-            exc_tb (traceback): Traceback of the exception, if any
+            exc_type: Exception type if an exception occurred
+            exc_value: Exception value if an exception occurred
+            traceback: Exception traceback if an exception occurred
         """
+        # Clean up session if it exists
         if self.session:
             await self.session.close()
             self.session = None
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> Optional[str]:
+    async def execute(self, method: str, url: str, retry: Optional[Retry] = None, **kwargs) -> Optional[Response]:
         """
-        Send an HTTP request using the specified method and URL.
+        Make an HTTP request with retry logic, exponential backoff, and proxy rotation.
+
+        This method handles retries for failed requests based on status codes,
+        implements exponential backoff for rate limiting, and rotates proxies on failure.
 
         Args:
-            method (str): HTTP method (e.g., 'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD')
-            url (str): The full URL for the request
-            **kwargs: Additional arguments to pass to the request method
+            method: HTTP method to use
+            url: Target URL
+            retry: Retry configuration (uses default if not provided)
+            **kwargs: Additional arguments for the request
 
         Returns:
-            Optional[str]: The response text if the request succeeds, otherwise None
+            Optional[Response]: Response object if successful, None if failed after all retries
         """
+        # Use instance retry config if none provided
+        retry = retry or self.retry
+
+        # Attempt request with retry logic
+        for attempt in range(retry.total + 1):
+            try:
+                # Set up proxy for this attempt
+                proxy_url = None
+                if self.proxies:
+                    if not self.proxy:
+                        self.proxy = next(self.cycle)
+
+                    if self.proxy:
+                        # Get proxy URL directly
+                        if self.proxy.username and self.proxy.password:
+                            proxy_url = f"http://{self.proxy.username}:{self.proxy.password}@{self.proxy.host}:{self.proxy.port}"
+                        else:
+                            proxy_url = f"http://{self.proxy.host}:{self.proxy.port}"
+
+                        kwargs['proxy'] = proxy_url
+
+                        # Add proxy headers if configured
+                        if self.proxy.headers:
+                            headers = kwargs.get('headers', {})
+                            headers.update(self.proxy.headers)
+                            kwargs['headers'] = headers
+
+                # Make HTTP request using session
+                async with self.session.request(method, url, **kwargs) as response:
+                    # Check if we should retry based on status code
+                    if response.status in retry.status and attempt < retry.total:
+                        warnings.warn(
+                            f"Request failed with status {response.status}, retrying... (attempt {attempt + 1}/{retry.total})")
+
+                        # Switch to next proxy on failure
+                        if self.proxies:
+                            self.proxy = next(self.cycle)
+
+                        # Exponential backoff delay
+                        await asyncio.sleep(retry.backoff * (2 ** attempt))
+                        continue
+
+                    # Raise exception for HTTP error status codes
+                    response.raise_for_status()
+                    return Response(response)
+
+            except aiohttp.ClientResponseError as error:
+                # Handle HTTP response errors with retry logic
+                if error.status in retry.status and attempt < retry.total:
+                    warnings.warn(
+                        f"Request failed with status {error.status}, retrying... (attempt {attempt + 1}/{retry.total})")
+
+                    # Switch to next proxy on failure
+                    if self.proxies:
+                        self.proxy = next(self.cycle)
+
+                    # Exponential backoff delay
+                    await asyncio.sleep(retry.backoff * (2 ** attempt))
+                    continue
+                else:
+                    # Log final failure
+                    warnings.warn(f"Request failed with status {error.status}: {error.message}")
+                    break
+            except (aiohttp.ClientConnectionError, aiohttp.ServerTimeoutError,
+                    aiohttp.ClientProxyConnectionError) as error:
+                # Handle connection, timeout, and proxy errors
+                if attempt < retry.total:
+                    warnings.warn(
+                        f"Request failed with {type(error).__name__}, retrying... (attempt {attempt + 1}/{retry.total})")
+
+                    # Switch to next proxy on connection failure
+                    if self.proxies:
+                        self.proxy = next(self.cycle)
+
+                    # Exponential backoff delay
+                    await asyncio.sleep(retry.backoff * (2 ** attempt))
+                    continue
+                else:
+                    # Log final failure
+                    warnings.warn(f"Request failed: {error}")
+                    break
+            except Exception as error:
+                # Handle unexpected errors
+                warnings.warn(f"An unexpected error occurred: {error}")
+                break
+
+        # Return None if all retries failed
+        return None
+
+    async def request(self, method: str, url: str, timeout: Optional[Union[float, Timeout]] = None,
+                      retry: Optional[Retry] = None, redirects: Optional[bool] = None, **kwargs) -> Optional[Response]:
+        """
+        Send an HTTP request using the specified method and URL with comprehensive error handling.
+
+        This is the core method that all other HTTP methods use internally.
+        It handles various types of errors gracefully and provides warnings
+        for debugging purposes.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
+            url: The target URL for the request
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+            **kwargs: Additional arguments passed to aiohttp (headers, data, json, etc.)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+
+        Raises:
+            RuntimeError: If the session is not initialized (not used in async with block)
+        """
+        # Ensure session is initialized
         if not self.session:
             raise RuntimeError("CrawlCore session is not initialized. Use it within an 'async with' block.")
 
-        try:
-            # Perform the HTTP request
-            response = await self.session.request(method, url, proxy=self.proxy, **kwargs)
-            response.raise_for_status()  # Raise for bad responses (non-2xx)
+        # Handle timeout parameter conversion
+        if timeout is not None:
+            if isinstance(timeout, (int, float)):
+                # Convert simple timeout to ClientTimeout
+                timeout = aiohttp.ClientTimeout(total=timeout)
+            elif isinstance(timeout, Timeout):
+                # Convert custom Timeout object
+                timeout = timeout.convert()
+            else:
+                # Use default timeout
+                timeout = self.timeout.convert()
+            kwargs['timeout'] = timeout
 
-            # Return the response text
-            return await response.text()
+        # Handle redirect parameters
+        if redirects is not None:
+            kwargs['allow_redirects'] = redirects
+
+        # Use default max_redirects from configuration
+        kwargs['max_redirects'] = self.redirects.maximum
+
+        # Build full URL from endpoint and relative path
+        if url.startswith('/'):
+            url = self.endpoint + url
+
+        # Execute request with retry logic
+        return await self.execute(method, url, retry, **kwargs)
+
+    async def get(self, url: str, params: Optional[Dict[str, Any]] = None,
+                  headers: Optional[Dict[str, str]] = None, timeout: Optional[Union[float, Timeout]] = None,
+                  retry: Optional[Retry] = None, redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send a GET request to retrieve data from the specified URL.
+
+        GET requests are used to fetch resources from the server without
+        modifying server state. Query parameters can be included.
+
+        Args:
+            url: The target URL for the GET request
+            params: Optional query parameters as key-value pairs
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Delegate to main request method with GET verb
+        return await self.request('GET', url, params=params, headers=headers,
+                                  timeout=timeout, retry=retry, redirects=redirects)
+
+    async def post(self, url: str, data: Optional[Union[Dict[str, Any], str]] = None,
+                   json: Optional[Dict[str, Any]] = None, files: Optional[Dict[str, Any]] = None,
+                   headers: Optional[Dict[str, str]] = None, timeout: Optional[Union[float, Timeout]] = None,
+                   retry: Optional[Retry] = None, redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send a POST request to submit data to the specified URL.
+
+        POST requests are used to create new resources or submit data to the server.
+        This method handles both regular form data and file uploads automatically.
+
+        Args:
+            url: The target URL for the POST request
+            data: Optional form data as dictionary or string
+            json: Optional JSON data as dictionary (automatically serialized)
+            files: Optional file uploads as key-value pairs
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Handle file uploads by creating multipart form data
+        if files:
+            # Create multipart form for file uploads
+            form = aiohttp.FormData()
+
+            # Add files first to the form data
+            for key, file in files.items():
+                form.add_field(key, file)
+
+            # Add regular data fields if they exist
+            if data:
+                for key, value in data.items():
+                    form.add_field(key, value)
+
+            # Send request with multipart form data
+            return await self.request('POST', url, data=form, headers=headers,
+                                      timeout=timeout, retry=retry, redirects=redirects)
+        else:
+            # No files, use data or json directly
+            return await self.request('POST', url, data=data, json=json, headers=headers,
+                                      timeout=timeout, retry=retry, redirects=redirects)
+
+    async def put(self, url: str, data: Optional[Union[Dict[str, Any], str]] = None,
+                  json: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None,
+                  timeout: Optional[Union[float, Timeout]] = None, retry: Optional[Retry] = None,
+                  redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send a PUT request to update or create a resource at the specified URL.
+
+        PUT requests are used to update existing resources or create new ones
+        with a specific identifier. The request replaces the entire resource.
+
+        Args:
+            url: The target URL for the PUT request
+            data: Optional form data as dictionary or string
+            json: Optional JSON data as dictionary (automatically serialized)
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Delegate to main request method with PUT verb
+        return await self.request('PUT', url, data=data, json=json, headers=headers,
+                                  timeout=timeout, retry=retry, redirects=redirects)
+
+    async def patch(self, url: str, data: Optional[Union[Dict[str, Any], str]] = None,
+                    json: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None,
+                    timeout: Optional[Union[float, Timeout]] = None, retry: Optional[Retry] = None,
+                    redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send a PATCH request to partially update a resource at the specified URL.
+
+        PATCH requests are used to make partial updates to existing resources,
+        unlike PUT which replaces the entire resource.
+
+        Args:
+            url: The target URL for the PATCH request
+            data: Optional form data as dictionary or string
+            json: Optional JSON data as dictionary (automatically serialized)
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Delegate to main request method with PATCH verb
+        return await self.request('PATCH', url, data=data, json=json, headers=headers,
+                                  timeout=timeout, retry=retry, redirects=redirects)
+
+    async def delete(self, url: str, headers: Optional[Dict[str, str]] = None,
+                     timeout: Optional[Union[float, Timeout]] = None, retry: Optional[Retry] = None,
+                     redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send a DELETE request to remove a resource at the specified URL.
+
+        DELETE requests are used to remove resources from the server.
+
+        Args:
+            url: The target URL for the DELETE request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Delegate to main request method with DELETE verb
+        return await self.request('DELETE', url, headers=headers, timeout=timeout,
+                                  retry=retry, redirects=redirects)
+
+    async def head(self, url: str, headers: Optional[Dict[str, str]] = None,
+                   timeout: Optional[Union[float, Timeout]] = None, retry: Optional[Retry] = None,
+                   redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send a HEAD request to retrieve headers from the specified URL.
+
+        HEAD requests are used to fetch response headers without the response body.
+
+        Args:
+            url: The target URL for the HEAD request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Delegate to main request method with HEAD verb
+        return await self.request('HEAD', url, headers=headers, timeout=timeout,
+                                  retry=retry, redirects=redirects)
+
+    async def options(self, url: str, headers: Optional[Dict[str, str]] = None,
+                      timeout: Optional[Union[float, Timeout]] = None, retry: Optional[Retry] = None,
+                      redirects: Optional[bool] = None) -> Optional[Response]:
+        """
+        Send an OPTIONS request to retrieve allowed methods for the specified URL.
+
+        OPTIONS requests are used to check what HTTP methods are supported.
+
+        Args:
+            url: The target URL for the OPTIONS request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            retry: Retry configuration for this request
+            redirects: Whether to follow redirects (uses default if not provided)
+
+        Returns:
+            Optional[Response]: Response object if successful, None if an error occurred
+        """
+        # Delegate to main request method with OPTIONS verb
+        return await self.request('OPTIONS', url, headers=headers, timeout=timeout,
+                                  retry=retry, redirects=redirects)
+
+    async def stream(self, method: str, url: str, timeout: Optional[Union[float, Timeout]] = None, **kwargs) -> Stream:
+        """
+        Send a streaming HTTP request for handling large data transfers.
+
+        This method creates a streaming connection that can be used for uploading
+        or downloading large amounts of data without loading everything into memory.
+
+        Args:
+            method: HTTP method for the streaming request
+            url: The target URL for the streaming request
+            timeout: Request timeout (float for simple timeout, Timeout object for detailed control)
+            **kwargs: Additional arguments passed to aiohttp
+
+        Returns:
+            Stream: Stream object for handling the streaming operation
+
+        Raises:
+            RuntimeError: If the session is not initialized
+            aiohttp.ClientResponseError: If the request fails with an HTTP error
+            aiohttp.ClientConnectionError: If there's a connection problem
+            aiohttp.ServerTimeoutError: If the request times out
+        """
+        # Ensure session is initialized
+        if not self.session:
+            raise RuntimeError("CrawlCore session is not initialized. Use it within an 'async with' block.")
+
+        # Handle timeout parameter conversion
+        if timeout is not None:
+            if isinstance(timeout, (int, float)):
+                # Convert simple timeout to ClientTimeout
+                timeout = aiohttp.ClientTimeout(total=timeout)
+            elif isinstance(timeout, Timeout):
+                # Convert custom Timeout object
+                timeout = timeout.convert()
+            else:
+                # Use default timeout
+                timeout = self.timeout.convert()
+            kwargs['timeout'] = timeout
+
+        # Set up proxy for streaming request
+        if self.proxies:
+            if not self.proxy:
+                self.proxy = next(self.cycle)
+
+            if self.proxy:
+                # Get proxy URL directly
+                if self.proxy.username and self.proxy.password:
+                    proxy_url = f"http://{self.proxy.username}:{self.proxy.password}@{self.proxy.host}:{self.proxy.port}"
+                else:
+                    proxy_url = f"http://{self.proxy.host}:{self.proxy.port}"
+
+                kwargs['proxy'] = proxy_url
+
+                # Add proxy headers if configured
+                if self.proxy.headers:
+                    headers = kwargs.get('headers', {})
+                    headers.update(self.proxy.headers)
+                    kwargs['headers'] = headers
+
+        # Build full URL from endpoint and relative path
+        if url.startswith('/'):
+            url = self.endpoint + url
+
+        try:
+            # Make streaming HTTP request
+            response = await self.session.request(method, url, **kwargs)
+
+            # Raise exception for HTTP error status codes
+            response.raise_for_status()
+
+            # Return stream wrapper for response
+            return Stream(response)
+
         except aiohttp.ClientResponseError as error:
+            # Log and re-raise HTTP response errors
             warnings.warn(f"Request failed with status {error.status}: {error.message}")
-        except aiohttp.ClientConnectionError:
-            warnings.warn("Connection closed prematurely.")
+            raise
+        except (aiohttp.ClientConnectionError, aiohttp.ClientProxyConnectionError) as error:
+            # Log and re-raise connection errors
+            warnings.warn(f"Connection error: {error}")
+            raise
+        except aiohttp.ServerTimeoutError:
+            # Log and re-raise timeout errors
+            warnings.warn("Request timed out")
+            raise
         except Exception as error:
+            # Log and re-raise unexpected errors
             warnings.warn(f"An unexpected error occurred: {error}")
-        return None
+            raise
