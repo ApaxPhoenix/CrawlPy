@@ -1,4 +1,3 @@
-import aiohttp
 from dataclasses import dataclass
 from typing import Optional, List
 
@@ -50,63 +49,6 @@ class Limits:
         if self.host > self.connections:
             raise ValueError("Per-host connections cannot exceed total connections")
 
-    def connector(self) -> aiohttp.TCPConnector:
-        """Create aiohttp TCPConnector with these limits.
-
-        Returns:
-            Configured TCPConnector instance for use with aiohttp sessions.
-        """
-        return aiohttp.TCPConnector(
-            limit=self.connections,
-            limit_per_host=self.host,
-            keepalive_timeout=30,  # Default keepalive timeout
-            enable_cleanup_closed=True
-        )
-
-    def available(self, count: int) -> int:
-        """Calculate available connections from total pool.
-
-        Args:
-            count: Number of connections currently in use.
-
-        Returns:
-            Number of available connections remaining.
-        """
-        return max(0, self.connections - count)
-
-    def exhausted(self, count: int) -> bool:
-        """Check if connection pool is exhausted.
-
-        Args:
-            count: Number of connections currently in use.
-
-        Returns:
-            True if no connections are available, False otherwise.
-        """
-        return count >= self.connections
-
-    def within(self, count: int) -> bool:
-        """Check if connection usage is within limits.
-
-        Args:
-            count: Number of connections currently in use.
-
-        Returns:
-            True if usage is within limits, False otherwise.
-        """
-        return count <= self.connections
-
-    def percentage(self, count: int) -> float:
-        """Calculate percentage of connections in use.
-
-        Args:
-            count: Number of connections currently in use.
-
-        Returns:
-            Percentage of connections in use (0.0 to 1.0).
-        """
-        return min(1.0, count / self.connections)
-
 
 @dataclass
 class Retry:
@@ -156,66 +98,6 @@ class Retry:
             if not (100 <= code <= 599):
                 raise ValueError(f"Invalid HTTP status code: {code}")
 
-    def delay(self, number: int) -> float:
-        """Calculate delay for a specific retry attempt.
-
-        Uses exponential backoff to calculate the delay before the next
-        retry attempt. This helps avoid overwhelming servers during
-        temporary outages.
-
-        Args:
-            number: Current retry attempt number (0-based).
-
-        Returns:
-            Delay in seconds before the next retry.
-        """
-        # Calculate exponential backoff delay
-        return self.backoff * (2 ** number)
-
-    def retriable(self, code: int) -> bool:
-        """Check if a status code should trigger a retry.
-
-        Args:
-            code: HTTP status code to check.
-
-        Returns:
-            True if the status code should trigger a retry, False otherwise.
-        """
-        return code in self.status
-
-    def remaining(self, number: int) -> int:
-        """Calculate remaining retry attempts.
-
-        Args:
-            number: Current retry attempt number (0-based).
-
-        Returns:
-            Number of retry attempts remaining.
-        """
-        return max(0, self.total - number)
-
-    def exhausted(self, number: int) -> bool:
-        """Check if retry attempts are exhausted.
-
-        Args:
-            number: Current retry attempt number (0-based).
-
-        Returns:
-            True if no retry attempts remain, False otherwise.
-        """
-        return number >= self.total
-
-    def available(self, number: int) -> bool:
-        """Check if retry attempts are still available.
-
-        Args:
-            number: Current retry attempt number (0-based).
-
-        Returns:
-            True if retry attempts are available, False otherwise.
-        """
-        return number < self.total
-
 
 @dataclass
 class Timeout:
@@ -264,77 +146,6 @@ class Timeout:
         if self.pool < min_required:
             raise ValueError(f"Pool timeout ({self.pool}) must be at least {min_required}")
 
-    def convert(self) -> aiohttp.ClientTimeout:
-        """Convert to aiohttp ClientTimeout object.
-
-        Transforms the timeout configuration into aiohttp's native
-        ClientTimeout format for use with HTTP sessions.
-
-        Returns:
-            Configured timeout object for aiohttp.
-        """
-        return aiohttp.ClientTimeout(
-            total=self.pool,
-            connect=self.connect,
-            sock_read=self.read,
-            sock_connect=self.connect
-        )
-
-    def elapsed(self, time: float) -> bool:
-        """Check if operation duration exceeds pool timeout.
-
-        Args:
-            time: Time elapsed in seconds.
-
-        Returns:
-            True if duration exceeds pool timeout, False otherwise.
-        """
-        return time > self.pool
-
-    def remaining(self, time: float) -> float:
-        """Calculate remaining time before pool timeout.
-
-        Args:
-            time: Time elapsed in seconds.
-
-        Returns:
-            Remaining time in seconds before timeout.
-        """
-        return max(0.0, self.pool - time)
-
-    def urgent(self, time: float) -> bool:
-        """Check if timeout is approaching (80% of pool timeout).
-
-        Args:
-            time: Time elapsed in seconds.
-
-        Returns:
-            True if timeout is approaching, False otherwise.
-        """
-        return time > (self.pool * 0.8)
-
-    def acceptable(self, time: float) -> bool:
-        """Check if operation duration is within acceptable limits.
-
-        Args:
-            time: Time elapsed in seconds.
-
-        Returns:
-            True if duration is acceptable, False otherwise.
-        """
-        return time <= self.pool
-
-    def percentage(self, time: float) -> float:
-        """Calculate percentage of pool timeout used.
-
-        Args:
-            time: Time elapsed in seconds.
-
-        Returns:
-            Percentage of timeout used (0.0 to 1.0+).
-        """
-        return time / self.pool
-
 
 @dataclass
 class Redirects:
@@ -346,11 +157,9 @@ class Redirects:
 
     Attributes:
         maximum: Maximum number of redirects to follow.
-        history: Whether to maintain redirect history in response.
     """
 
     maximum: int = 10  # Maximum number of redirects to follow
-    history: bool = True  # Whether to maintain redirect history in response
 
     def __post_init__(self) -> None:
         """Validate redirect configuration.
@@ -367,57 +176,3 @@ class Redirects:
         # Validate maximum redirects
         if self.maximum < 0:
             raise ValueError("Maximum redirects cannot be negative")
-        if self.maximum > 30:
-            raise ValueError("Maximum redirects should not exceed 30")
-
-    def allowed(self, count: int) -> bool:
-        """Check if redirect count is within allowed limits.
-
-        Args:
-            count: Current number of redirects followed.
-
-        Returns:
-            True if more redirects are allowed, False otherwise.
-        """
-        return count < self.maximum
-
-    def exhausted(self, count: int) -> bool:
-        """Check if redirect limit has been exhausted.
-
-        Args:
-            count: Current number of redirects followed.
-
-        Returns:
-            True if redirect limit is exhausted, False otherwise.
-        """
-        return count >= self.maximum
-
-    def remaining(self, count: int) -> int:
-        """Calculate remaining redirects allowed.
-
-        Args:
-            count: Current number of redirects followed.
-
-        Returns:
-            Number of redirects remaining.
-        """
-        return max(0, self.maximum - count)
-
-    def trackable(self) -> bool:
-        """Check if redirect history should be maintained.
-
-        Returns:
-            True if history should be tracked, False otherwise.
-        """
-        return self.history
-
-    def percentage(self, count: int) -> float:
-        """Calculate percentage of redirect limit used.
-
-        Args:
-            count: Current number of redirects followed.
-
-        Returns:
-            Percentage of redirect limit used (0.0 to 1.0+).
-        """
-        return count / self.maximum if self.maximum > 0 else 0.0

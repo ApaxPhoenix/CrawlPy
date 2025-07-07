@@ -1,6 +1,5 @@
 import aiohttp
 import json
-import time
 from typing import Dict, Any, AsyncIterator
 
 
@@ -9,7 +8,7 @@ class Response:
     Class for handling HTTP responses with comprehensive response data access.
 
     This class wraps aiohttp responses to provide a unified interface for accessing
-    response data, headers, status codes, and other metadata. It tracks timing
+    response data, headers, status codes, cookies, and other metadata. It tracks timing
     information and provides convenient methods for different content types.
     """
 
@@ -21,12 +20,11 @@ class Response:
             response: The aiohttp ClientResponse object to wrap
         """
         self.response = response
-        self.time = time.time()  # Record response creation time for elapsed calculation
 
     @property
     def status(self) -> int:
         """
-        Return the HTTP status code (error.g., 200, 404, 500).
+        Return the HTTP status code (e.g., 200, 404, 500).
 
         Returns:
             int: The HTTP status code from the response
@@ -36,7 +34,7 @@ class Response:
     @property
     def reason(self) -> str:
         """
-        Return the HTTP reason phrase (error.g., "OK", "Not Found", "Internal Server Error").
+        Return the HTTP reason phrase (e.g., "OK", "Not Found", "Internal Server Error").
 
         Returns:
             str: The HTTP reason phrase associated with the status code
@@ -54,16 +52,6 @@ class Response:
         return str(self.response.url)
 
     @property
-    def elapsed(self) -> float:
-        """
-        Return the request duration in seconds from response creation.
-
-        Returns:
-            float: Time elapsed since response object was created
-        """
-        return time.time() - self.time
-
-    @property
     def headers(self) -> Dict[str, str]:
         """
         Return the HTTP response headers as a dictionary.
@@ -72,6 +60,16 @@ class Response:
             Dict[str, str]: Dictionary containing all response headers
         """
         return dict(self.response.headers)
+
+    @property
+    def cookies(self) -> Dict[str, str]:
+        """
+        Return the HTTP response cookies as a dictionary.
+
+        Returns:
+            Dict[str, str]: Dictionary containing all cookies with name-value pairs
+        """
+        return {cookie.key: cookie.value for cookie in self.response.cookies.values()}
 
     @property
     def type(self) -> str:
@@ -131,7 +129,6 @@ class Response:
         """
         async for chunk in self.response.content.iter_chunked(size):
             yield chunk
-
 
 class Stream(Response):
     """

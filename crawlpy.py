@@ -1,6 +1,11 @@
+import aiohttp
 import warnings
-from typing import Optional, Any, Dict
-from .core import CrawlCore
+from typing import Optional, Any, Dict, Union
+from core import CrawlCore
+from config import Limits, Retry, Timeout, Redirects
+from settings import SSL, Proxy
+from auth import Basic, Bearer, JWT, Key, OAuth
+from broadcast import Response, Stream
 
 
 class CrawlPy:
@@ -8,31 +13,74 @@ class CrawlPy:
     A requests-like HTTP client wrapper for CrawlCore.
     Provides simple methods for making HTTP requests with a familiar interface.
 
-    This class implements all standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE)
+    This class implements all standard HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
     and follows a similar pattern to the popular 'requests' library for ease of use.
+
+    Supports both single-use requests and persistent client usage.
     """
 
-    def __init__(self, endpoint: Optional[str] = None, duration: Optional[float] = 10,
-                 proxy: Optional[dict] = None, ssl: Optional[bool] = None,
-                 cookies: Optional[Any] = None) -> None:
+    def __init__(self, endpoint: Optional[str] = None,
+                 limits: Optional[Limits] = None,
+                 timeout: Optional[Timeout] = None,
+                 retry: Optional[Retry] = None,
+                 redirects: Optional[Redirects] = None,
+                 proxy: Optional[Proxy] = None,
+                 ssl: Optional[SSL] = None,
+                 auth: Optional[Union[Basic, Bearer, JWT, Key, OAuth]] = None,
+                 cookies: Optional[Dict[str, str]] = None,
+                 hooks: Optional[Dict[str, Any]] = None) -> None:
         """
         Initialize CrawlPy with optional base URL and configurations.
 
         Args:
-            endpoint (Optional[str]): Base URL for all requests. If provided, will be prepended to all request URLs
-            duration (Optional[float]): Connection timeout in seconds (default: 10)
-            proxy (Optional[dict]): Proxy configuration dictionary for proxy server settings
-            ssl (Optional[bool]): SSL verification settings. Set to False to disable SSL verification
-            cookies (Optional[Any]): Cookie configuration for maintaining session state
+            endpoint: Base URL for all requests. If provided, will be prepended to all request URLs
+            limits: Connection limits configuration
+            timeout: Timeout configuration for requests
+            retry: Retry configuration for failed requests
+            redirects: Redirect handling configuration
+            proxy: Proxy configuration for requests
+            ssl: SSL/TLS configuration
+            auth: Authentication configuration (Basic, Bearer, JWT, Key, or OAuth)
+            cookies: Default cookies as key-value pairs
+            hooks: Request/response hooks {"request": callable, "response": callable}
         """
-        self.client: Optional[CrawlCore] = None
+        self.core: Optional[CrawlCore] = None
         self.endpoint = endpoint
-        self.duration = duration
+        self.limits = limits
+        self.timeout = timeout
+        self.retry = retry
+        self.redirects = redirects
         self.proxy = proxy
         self.ssl = ssl
+        self.auth = auth
         self.cookies = cookies
+        self.hooks = hooks
 
-    async def request(self, method: str, url: str, **kwargs: Any) -> Optional[str]:
+    async def __aenter__(self) -> "CrawlPy":
+        """Enter async context manager for persistent client usage."""
+        if not self.core and self.endpoint:
+            self.core = CrawlCore(
+                endpoint=self.endpoint,
+                limits=self.limits,
+                timeout=self.timeout,
+                retry=self.retry,
+                redirects=self.redirects,
+                proxy=self.proxy,
+                ssl=self.ssl,
+                auth=self.auth,
+                cookies=self.cookies,
+                hooks=self.hooks
+            )
+            await self.core.__aenter__()
+        return self
+
+    async def __aexit__(self, t, v, tb):
+        """Exit async context manager and cleanup client."""
+        if self.core:
+            await self.core.__aexit__(t, v, tb)
+            self.core = None
+
+    async def request(self, method: str, url: str, **kwargs: Any) -> Optional[Response]:
         """
         Core method to send HTTP requests. All other HTTP method helpers delegate to this method.
 
@@ -40,144 +88,276 @@ class CrawlPy:
         and error handling for all requests.
 
         Args:
-            method (str): HTTP method to use (GET, POST, etc.)
-            url (str): URL or endpoint for the request
+            method: HTTP method to use (GET, POST, etc.)
+            url: URL or endpoint for the request
             **kwargs: Additional arguments to pass to the underlying request
 
         Returns:
-            Optional[str]: Response text if successful, None if the request fails
+            Optional[Response]: Response object if successful, None if the request fails
         """
         try:
-            # Join endpoint and URL if endpoint is provided
-            path = f"{self.endpoint.rstrip('/')}/{url.lstrip('/')}" if self.endpoint else url
+            # If we have a persistent client, use it
+            if self.core:
+                return await self.core.request(method, url, **kwargs)
 
-            # Create new CrawlCore instance with configured settings
-            self.client = CrawlCore(self.endpoint or url, self.duration, self.proxy, self.ssl, self.cookies)
+            # Otherwise, create a temporary client for this request
+            # Determine the endpoint - use provided endpoint or extract from URL
+            if self.endpoint:
+                endpoint = self.endpoint
+                path = url
+            else:
+                # Extract endpoint from URL for temporary client
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                path = url
 
-            # Use context manager to ensure proper client cleanup
-            async with self.client:
-                return await self.client.request(method, path, **kwargs)
+            # Create temporary CrawlCore instance
+            core = CrawlCore(
+                endpoint=endpoint,
+                limits=self.limits,
+                timeout=self.timeout,
+                retry=self.retry,
+                redirects=self.redirects,
+                proxy=self.proxy,
+                ssl=self.ssl,
+                auth=self.auth,
+                cookies=self.cookies,
+                hooks=self.hooks
+            )
+
+            # Use context manager to ensure proper cleanup
+            async with core as context:
+                return await context.request(method, path, **kwargs)
+
         except Exception as error:
             warnings.warn(f"Request failed: {error}")
             return None
 
-    async def get(self, url: str, params: Optional[Dict] = None, **kwargs: Any) -> Optional[str]:
+    async def stream(self, method: str, url: str,
+                     headers: Optional[Dict[str, str]] = None,
+                     timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                     cookies: Optional[Dict[str, str]] = None,
+                     **kwargs: Any) -> Optional[Stream]:
         """
-        Send a GET request.
+        Send a streaming HTTP request for handling large data transfers.
+
+        This method creates a streaming connection that can be used for uploading
+        or downloading large amounts of data without loading everything into memory.
 
         Args:
-            url (str): URL or endpoint for the request
-            params (Optional[Dict]): Query parameters to append to the URL
-            **kwargs: Additional arguments to pass to the request
+            method: HTTP method for the streaming request (GET, POST, etc.)
+            url: The target URL for the streaming request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            cookies: Optional cookies as key-value pairs
+            **kwargs: Additional arguments to pass to the underlying stream request
 
         Returns:
-            Optional[str]: Response text if successful, None otherwise
+            Optional[Stream]: Stream object if successful, None if the request fails
         """
-        kwargs['params'] = params
-        return await self.request('GET', url, **kwargs)
+        try:
+            # If we have a persistent client, use it
+            if self.core:
+                return await self.core.stream(method, url, timeout=timeout,
+                                              cookies=cookies, headers=headers, **kwargs)
 
-    async def post(self, url: str, data: Optional[Any] = None,
-                   json: Optional[Dict] = None, **kwargs: Any) -> Optional[str]:
+            # Otherwise, create a temporary client for this request
+            # Determine the endpoint - use provided endpoint or extract from URL
+            if self.endpoint:
+                endpoint = self.endpoint
+                path = url
+            else:
+                # Extract endpoint from URL for temporary client
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                path = url
+
+            # Create temporary CrawlCore instance
+            core = CrawlCore(
+                endpoint=endpoint,
+                limits=self.limits,
+                timeout=self.timeout,
+                retry=self.retry,
+                redirects=self.redirects,
+                proxy=self.proxy,
+                ssl=self.ssl,
+                auth=self.auth,
+                cookies=self.cookies,
+                hooks=self.hooks
+            )
+
+            # Use context manager to ensure proper cleanup
+            async with core as context:
+                return await context.stream(method, path, timeout=timeout,
+                                            cookies=cookies, headers=headers, **kwargs)
+
+        except Exception as error:
+            warnings.warn(f"Stream request failed: {error}")
+            return None
+
+    async def get(self, url: str, params: Optional[Dict[str, Any]] = None,
+                  headers: Optional[Dict[str, str]] = None,
+                  timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                  redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send a POST request.
-
+        Send a GET request to retrieve data from the specified URL.
+        GET requests are used to fetch resources from the server without
+        modifying server state. Query parameters can be included.
         Args:
-            url (str): URL or endpoint for the request
-            data (Optional[Any]): Form-encoded data to send in the request body
-            json (Optional[Dict]): JSON data to send in the request body
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the GET request
+            params: Optional query parameters as key-value pairs
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response text if successful, None otherwise
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        kwargs['data'] = data
-        kwargs['json'] = json
-        return await self.request('POST', url, **kwargs)
+        # Delegate to main request method with GET verb
+        return await self.request('GET', url, params=params, headers=headers,
+                                  timeout=timeout, redirects=redirects, cookies=cookies)
 
-    async def put(self, url: str, data: Optional[Any] = None,
-                  json: Optional[Dict] = None, **kwargs: Any) -> Optional[str]:
+    async def post(self, url: str, data: Optional[Union[Dict[str, Any], str]] = None,
+                   json: Optional[Dict[str, Any]] = None, files: Optional[Dict[str, Any]] = None,
+                   headers: Optional[Dict[str, str]] = None,
+                   timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                   redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send a PUT request.
-
+        Send a POST request to submit data to the specified URL.
+        POST requests are used to create new resources or submit data to the server.
+        This method handles both regular form data and file uploads automatically.
         Args:
-            url (str): URL or endpoint for the request
-            data (Optional[Any]): Form-encoded data to send in the request body
-            json (Optional[Dict]): JSON data to send in the request body
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the POST request
+            data: Optional form data as dictionary or string
+            json: Optional JSON data as dictionary (automatically serialized)
+            files: Optional file uploads as key-value pairs
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response text if successful, None otherwise
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        kwargs['data'] = data
-        kwargs['json'] = json
-        return await self.request('PUT', url, **kwargs)
+        # Handle file uploads by creating multipart form data
+        if files:
+            # Create multipart form for file uploads
+            form = aiohttp.FormData()
+            # Add files first to the form data
+            for key, file in files.items():
+                form.add_field(key, file)
+            # Add regular data fields if they exist
+            if data:
+                for key, value in data.items():
+                    form.add_field(key, value)
+            # Send request with multipart form data
+            return await self.request('POST', url, data=form, headers=headers,
+                                      timeout=timeout, redirects=redirects, cookies=cookies)
+        else:
+            # No files, use data or json directly
+            return await self.request('POST', url, data=data, json=json, headers=headers,
+                                      timeout=timeout, redirects=redirects, cookies=cookies)
 
-    async def delete(self, url: str, **kwargs: Any) -> Optional[str]:
+    async def put(self, url: str, data: Optional[Union[Dict[str, Any], str]] = None,
+                  json: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None,
+                  timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                  redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send a DELETE request.
-
+        Send a PUT request to update or create a resource at the specified URL.
+        PUT requests are used to update existing resources or create new ones
+        with a specific identifier. The request replaces the entire resource.
         Args:
-            url (str): URL or endpoint for the request
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the PUT request
+            data: Optional form data as dictionary or string
+            json: Optional JSON data as dictionary (automatically serialized)
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response text if successful, None otherwise
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        return await self.request('DELETE', url, **kwargs)
+        # Delegate to main request method with PUT verb
+        return await self.request('PUT', url, data=data, json=json, headers=headers,
+                                  timeout=timeout, redirects=redirects, cookies=cookies)
 
-    async def patch(self, url: str, data: Optional[Any] = None,
-                    json: Optional[Dict] = None, **kwargs: Any) -> Optional[str]:
+    async def patch(self, url: str, data: Optional[Union[Dict[str, Any], str]] = None,
+                    json: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None,
+                    timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                    redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send a PATCH request.
-
+        Send a PATCH request to partially update a resource at the specified URL.
+        PATCH requests are used to make partial updates to existing resources,
+        unlike PUT which replaces the entire resource.
         Args:
-            url (str): URL or endpoint for the request
-            data (Optional[Any]): Form-encoded data to send in the request body
-            json (Optional[Dict]): JSON data to send in the request body
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the PATCH request
+            data: Optional form data as dictionary or string
+            json: Optional JSON data as dictionary (automatically serialized)
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response text if successful, None otherwise
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        kwargs['data'] = data
-        kwargs['json'] = json
-        return await self.request('PATCH', url, **kwargs)
+        # Delegate to main request method with PATCH verb
+        return await self.request('PATCH', url, data=data, json=json, headers=headers,
+                                  timeout=timeout, redirects=redirects, cookies=cookies)
 
-    async def head(self, url: str, **kwargs: Any) -> Optional[str]:
+    async def delete(self, url: str, headers: Optional[Dict[str, str]] = None,
+                     timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                     redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send a HEAD request. Similar to GET but returns only headers, no body.
-
+        Send a DELETE request to remove a resource at the specified URL.
+        DELETE requests are used to remove resources from the server.
         Args:
-            url (str): URL or endpoint for the request
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the DELETE request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response headers if successful, None otherwise
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        return await self.request('HEAD', url, **kwargs)
+        # Delegate to main request method with DELETE verb
+        return await self.request('DELETE', url, headers=headers, timeout=timeout,
+                                  redirects=redirects, cookies=cookies)
 
-    async def options(self, url: str, **kwargs: Any) -> Optional[str]:
+    async def head(self, url: str, headers: Optional[Dict[str, str]] = None,
+                   timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                   redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send an OPTIONS request. Used to describe the communication options for the target resource.
-
+        Send a HEAD request to retrieve headers from the specified URL.
+        HEAD requests are used to fetch response headers without the response body.
         Args:
-            url (str): URL or endpoint for the request
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the HEAD request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response text containing allowed methods and other options
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        return await self.request('OPTIONS', url, **kwargs)
+        # Delegate to main request method with HEAD verb
+        return await self.request('HEAD', url, headers=headers, timeout=timeout,
+                                  redirects=redirects, cookies=cookies)
 
-    async def trace(self, url: str, **kwargs: Any) -> Optional[str]:
+    async def options(self, url: str, headers: Optional[Dict[str, str]] = None,
+                      timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+                      redirects: Optional[bool] = None, cookies: Optional[Dict[str, str]] = None) -> Optional[Response]:
         """
-        Send a TRACE request. Used to perform a message loop-back test along the path to the target resource.
-
+        Send an OPTIONS request to retrieve allowed methods for the specified URL.
+        OPTIONS requests are used to check what HTTP methods are supported.
         Args:
-            url (str): URL or endpoint for the request
-            **kwargs: Additional arguments to pass to the request
-
+            url: The target URL for the OPTIONS request
+            headers: Optional HTTP headers as key-value pairs
+            timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
+            redirects: Whether to follow redirects (uses default if not provided)
+            cookies: Optional cookies as key-value pairs
         Returns:
-            Optional[str]: Response text containing the TRACE message
+            Optional[Response]: Response object if successful, None if an error occurred
         """
-        return await self.request('TRACE', url, **kwargs)
+        # Delegate to main request method with OPTIONS verb
+        return await self.request('OPTIONS', url, headers=headers, timeout=timeout,
+                                  redirects=redirects, cookies=cookies)

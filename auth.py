@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any
 import base64
 import json
-import time
 
 
 @dataclass
@@ -39,50 +38,6 @@ class Basic:
             # Create complete authorization header
             self.auth = f"Basic {encoded}"
 
-    def valid(self) -> bool:
-        """Check if basic auth credentials are valid.
-
-        Returns:
-            True if user and password are provided, False otherwise.
-        """
-        return bool(self.user and self.password)
-
-    def empty(self) -> bool:
-        """Check if credentials are empty.
-
-        Returns:
-            True if user or password is empty, False otherwise.
-        """
-        return not self.user or not self.password
-
-    def encoded(self) -> str:
-        """Get base64 encoded credentials.
-
-        Returns:
-            Base64 encoded username:password string.
-        """
-        credentials = f"{self.user}:{self.password}"
-        return base64.b64encode(credentials.encode()).decode()
-
-    def header(self) -> Dict[str, str]:
-        """Get authorization header dictionary.
-
-        Returns:
-            Dictionary containing Authorization header.
-        """
-        return {"Authorization": self.auth}
-
-    def matches(self, other: 'Basic') -> bool:
-        """Check if credentials match another Basic auth.
-
-        Args:
-            other: Another Basic auth instance to compare.
-
-        Returns:
-            True if credentials match, False otherwise.
-        """
-        return self.user == other.user and self.password == other.password
-
 
 @dataclass
 class Bearer:
@@ -113,49 +68,6 @@ class Bearer:
         if not self.auth:
             # Create authorization header with scheme and token
             self.auth = f"{self.scheme} {self.token}"
-
-    def valid(self) -> bool:
-        """Check if bearer token is valid.
-
-        Returns:
-            True if token is provided, False otherwise.
-        """
-        return bool(self.token)
-
-    def empty(self) -> bool:
-        """Check if token is empty.
-
-        Returns:
-            True if token is empty, False otherwise.
-        """
-        return not self.token
-
-    def header(self) -> Dict[str, str]:
-        """Get authorization header dictionary.
-
-        Returns:
-            Dictionary containing Authorization header.
-        """
-        return {"Authorization": self.auth}
-
-    def matches(self, other: 'Bearer') -> bool:
-        """Check if token matches another Bearer auth.
-
-        Args:
-            other: Another Bearer auth instance to compare.
-
-        Returns:
-            True if tokens match, False otherwise.
-        """
-        return self.token == other.token and self.scheme == other.scheme
-
-    def length(self) -> int:
-        """Get token length.
-
-        Returns:
-            Number of characters in the token.
-        """
-        return len(self.token)
 
 
 @dataclass
@@ -213,74 +125,6 @@ class JWT:
                 # This prevents crashes with malformed tokens
                 pass
 
-    def valid(self) -> bool:
-        """Check if JWT token is valid format.
-
-        Returns:
-            True if token has valid JWT format, False otherwise.
-        """
-        return bool(self.token and len(self.token.split('.')) == 3)
-
-    def empty(self) -> bool:
-        """Check if token is empty.
-
-        Returns:
-            True if token is empty, False otherwise.
-        """
-        return not self.token
-
-    def expired(self) -> bool:
-        """Check if JWT token is expired.
-
-        Returns:
-            True if token is expired, False if valid or no expiration.
-        """
-        if not self.data or 'exp' not in self.data:
-            return False
-        return time.time() > self.data['exp']
-
-    def remaining(self) -> int:
-        """Get remaining time before token expires.
-
-        Returns:
-            Seconds until expiration, 0 if expired or no expiration.
-        """
-        if not self.data or 'exp' not in self.data:
-            return 0
-        return max(0, int(self.data['exp'] - time.time()))
-
-    def header(self) -> Dict[str, str]:
-        """Get authorization header dictionary.
-
-        Returns:
-            Dictionary containing Authorization header.
-        """
-        return {"Authorization": self.auth}
-
-    def payload(self) -> Dict[str, Any]:
-        """Get decoded JWT payload.
-
-        Returns:
-            Dictionary containing JWT payload data.
-        """
-        return self.data or {}
-
-    def subject(self) -> Optional[str]:
-        """Get JWT subject claim.
-
-        Returns:
-            Subject claim from JWT payload, None if not present.
-        """
-        return self.data.get('sub') if self.data else None
-
-    def issuer(self) -> Optional[str]:
-        """Get JWT issuer claim.
-
-        Returns:
-            Issuer claim from JWT payload, None if not present.
-        """
-        return self.data.get('iss') if self.data else None
-
 
 @dataclass
 class Key:
@@ -316,63 +160,6 @@ class Key:
         # Validate name is not empty
         if not self.name:
             raise ValueError("Name cannot be empty")
-
-    def valid(self) -> bool:
-        """Check if API key is valid.
-
-        Returns:
-            True if value is provided, False otherwise.
-        """
-        return bool(self.value)
-
-    def empty(self) -> bool:
-        """Check if API key is empty.
-
-        Returns:
-            True if value is empty, False otherwise.
-        """
-        return not self.value
-
-    def header(self) -> Dict[str, str]:
-        """Get API key as header dictionary.
-
-        Returns:
-            Dictionary containing API key header if place is 'header'.
-        """
-        if self.place == "header":
-            return {self.name: self.value}
-        return {}
-
-    def query(self) -> Dict[str, str]:
-        """Get API key as query parameter dictionary.
-
-        Returns:
-            Dictionary containing API key parameter if place is 'query'.
-        """
-        if self.place == "query":
-            return {self.name: self.value}
-        return {}
-
-    def matches(self, other: 'Key') -> bool:
-        """Check if API key matches another Key auth.
-
-        Args:
-            other: Another Key auth instance to compare.
-
-        Returns:
-            True if keys match, False otherwise.
-        """
-        return (self.value == other.value and
-                self.place == other.place and
-                self.name == other.name)
-
-    def length(self) -> int:
-        """Get API key length.
-
-        Returns:
-            Number of characters in the key value.
-        """
-        return len(self.value)
 
 
 @dataclass
@@ -417,88 +204,3 @@ class OAuth:
         # Generate authorization header if token is available
         if self.token:
             self.auth = f"Bearer {self.token}"
-
-    def valid(self) -> bool:
-        """Check if OAuth configuration is valid.
-
-        Returns:
-            True if client and secret are provided, False otherwise.
-        """
-        return bool(self.client and self.secret)
-
-    def empty(self) -> bool:
-        """Check if OAuth credentials are empty.
-
-        Returns:
-            True if client or secret is empty, False otherwise.
-        """
-        return not self.client or not self.secret
-
-    def authenticated(self) -> bool:
-        """Check if OAuth has valid access token.
-
-        Returns:
-            True if access token is present, False otherwise.
-        """
-        return bool(self.token)
-
-    def expired(self) -> bool:
-        """Check if OAuth token is expired.
-
-        Returns:
-            True if token is expired, False if valid or no expiration.
-        """
-        if not self.expires:
-            return False
-        return time.time() > self.expires
-
-    def remaining(self) -> int:
-        """Get remaining time before token expires.
-
-        Returns:
-            Seconds until expiration, 0 if expired or no expiration.
-        """
-        if not self.expires:
-            return 0
-        return max(0, int(self.expires - time.time()))
-
-    def refreshable(self) -> bool:
-        """Check if OAuth has refresh token available.
-
-        Returns:
-            True if refresh token is present, False otherwise.
-        """
-        return bool(self.refresh)
-
-    def header(self) -> Dict[str, str]:
-        """Get authorization header dictionary.
-
-        Returns:
-            Dictionary containing Authorization header if token exists.
-        """
-        if self.token:
-            return {"Authorization": self.auth}
-        return {}
-
-    def credentials(self) -> Dict[str, str]:
-        """Get OAuth client credentials.
-
-        Returns:
-            Dictionary containing client ID and secret.
-        """
-        return {"client_id": self.client, "client_secret": self.secret}
-
-    def payload(self) -> Dict[str, str]:
-        """Get OAuth token request payload.
-
-        Returns:
-            Dictionary containing grant type, scope, and credentials.
-        """
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": self.client,
-            "client_secret": self.secret
-        }
-        if self.scope:
-            data["scope"] = self.scope
-        return data
