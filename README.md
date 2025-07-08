@@ -15,12 +15,6 @@
 * **SSL Configuration** - Custom SSL contexts and certificates
 * **Request/Response Hooks** - Transform requests/responses
 
-## Installation
-
-```bash
-pip install crawlpy
-```
-
 ## Quick Start
 
 ```python
