@@ -402,21 +402,6 @@ async def safe_request():
 
 **Note:** Failed requests return `None` and emit warnings rather than raising exceptions.
 
-## Base URL with Relative Paths
-
-Use a base endpoint for cleaner relative path requests:
-
-```python
-# Set base endpoint
-client = CrawlPy(endpoint='https://api.example.com/v1')
-
-async with client:
-    # All requests use base endpoint
-    users = await client.get('/users')          # GET https://api.example.com/v1/users
-    user = await client.get('/users/123')       # GET https://api.example.com/v1/users/123
-    posts = await client.get('/posts')          # GET https://api.example.com/v1/posts
-```
-
 ## Request/Response Hooks
 
 Transform requests and responses with middleware functions:
