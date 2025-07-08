@@ -27,8 +27,8 @@ pip install crawlpy
 import asyncio
 from crawlpy import CrawlPy
 
-async def main():
-    # Configure client with base endpoint
+async def main() -> None:
+    # Configure client with base endpoint and connection settings
     client = CrawlPy(
         endpoint='https://api.example.com',
         timeout=Timeout(connect=5.0, read=30.0),
@@ -37,7 +37,7 @@ async def main():
     
     # Use context manager for persistent connections
     async with client:
-        response = await client.get('/users')
+        response = await client.request('GET', '/users')
         print(f"Status: {response.status}")
         print(f"Content: {response.json()}")
 
@@ -50,17 +50,18 @@ asyncio.run(main())
 
 ```python
 async with CrawlPy() as client:
-    # Basic GET
-    response = await client.get('https://example.com/users')
+    # Basic GET request to fetch all users
+    response = await client.request('GET', 'https://example.com/users')
 
-    # With params
-    response = await client.get('https://example.com/users', params={'page': 1, 'limit': 10})
+    # GET with query parameters for pagination
+    response = await client.request('GET', 'https://example.com/users', params={'page': 1, 'limit': 10})
 
-    # With headers
-    response = await client.get('https://example.com/profile', headers={'Accept': 'application/json'})
+    # GET with custom headers for content negotiation
+    response = await client.request('GET', 'https://example.com/profile', headers={'Accept': 'application/json'})
 
-    # With timeout and cookies
-    response = await client.get(
+    # GET with timeout and session cookies
+    response = await client.request(
+        'GET',
         'https://example.com/data',
         timeout=15.0,
         cookies={'session': 'abc123'}
@@ -71,42 +72,63 @@ async with CrawlPy() as client:
 
 ```python
 async with CrawlPy() as client:
-    # JSON data (auto sets Content-Type)
-    response = await client.post('https://example.com/users', json={'name': 'Alice', 'email': 'alice@example.com'})
+    # POST JSON data - automatically sets Content-Type to application/json
+    response = await client.request('POST', 'https://example.com/users', json={'name': 'Alice', 'email': 'alice@example.com'})
 
-    # Form data
-    response = await client.post('https://example.com/login', data={'username': 'alice', 'password': 'secret'})
+    # POST form data - sends as application/x-www-form-urlencoded
+    response = await client.request('POST', 'https://example.com/login', data={'username': 'alice', 'password': 'secret'})
 
-    # File upload
+    # POST file upload - sends as multipart/form-data
     files = {'document': open('report.pdf', 'rb')}
-    response = await client.post('https://example.com/upload', files=files)
+    response = await client.request('POST', 'https://example.com/upload', files=files)
 
-    # Mixed form and files
-    response = await client.post(
+    # POST mixed form data and files
+    response = await client.request(
+        'POST',
         'https://example.com/submit',
         data={'title': 'My Document'},
         files={'file': open('document.pdf', 'rb')}
     )
 ```
 
-### Other Methods
+### PUT Requests
 
 ```python
 async with CrawlPy() as client:
-    # Replace resource
-    response = await client.put('https://example.com/users/1', json={'name': 'Bob', 'email': 'bob@example.com'})
+    # PUT to replace entire resource
+    response = await client.request('PUT', 'https://example.com/users/1', json={'name': 'Bob', 'email': 'bob@example.com'})
+```
 
-    # Partial update
-    response = await client.patch('https://example.com/tasks/789', json={'status': 'completed'})
+### PATCH Requests
 
-    # Delete resource
-    response = await client.delete('https://example.com/users/123')
+```python
+async with CrawlPy() as client:
+    # PATCH to partially update resource
+    response = await client.request('PATCH', 'https://example.com/tasks/789', json={'status': 'completed'})
+```
 
-    # Headers only
-    response = await client.head('https://cdn.example.com/large-file.zip')
+### DELETE Requests
 
-    # Check methods
-    response = await client.options('https://api.example.com/users')
+```python
+async with CrawlPy() as client:
+    # DELETE to remove resource
+    response = await client.request('DELETE', 'https://example.com/users/123')
+```
+
+### HEAD Requests
+
+```python
+async with CrawlPy() as client:
+    # HEAD to get headers only (no body)
+    response = await client.request('HEAD', 'https://cdn.example.com/large-file.zip')
+```
+
+### OPTIONS Requests
+
+```python
+async with CrawlPy() as client:
+    # OPTIONS to check allowed methods
+    response = await client.request('OPTIONS', 'https://api.example.com/users')
 ```
 
 ## Configuration
@@ -116,12 +138,13 @@ async with CrawlPy() as client:
 ```python
 from config import Timeout
 
+# Set specific timeouts for different connection phases
 timeout = Timeout(connect=5.0, read=30.0, write=10.0, pool=60.0)
 client = CrawlPy(timeout=timeout)
 
-# Per-request override
+# Per-request timeout override
 async with client:
-    response = await client.get('https://example.com', timeout=15.0)
+    response = await client.request('GET', 'https://example.com', timeout=15.0)
 ```
 
 ### Retry
@@ -129,6 +152,7 @@ async with client:
 ```python
 from config import Retry
 
+# Configure retry logic with exponential backoff for server errors
 retry = Retry(total=5, backoff=1.5, status=[500, 502, 503, 504])
 client = CrawlPy(retry=retry)
 ```
@@ -138,6 +162,7 @@ client = CrawlPy(retry=retry)
 ```python
 from config import Limits
 
+# Set connection pooling limits to manage resource usage
 limits = Limits(connections=100, keepalive=20, host=10)
 client = CrawlPy(limits=limits)
 ```
@@ -147,6 +172,7 @@ client = CrawlPy(limits=limits)
 ```python
 from config import Redirects
 
+# Configure maximum number of redirects to follow
 redirects = Redirects(maximum=10)
 client = CrawlPy(redirects=redirects)
 ```
@@ -158,11 +184,13 @@ client = CrawlPy(redirects=redirects)
 ```python
 from auth import Basic
 
+# Create HTTP Basic Authentication with username/password
 auth = Basic('username', 'password')
 client = CrawlPy(auth=auth)
 
 async with client:
-    response = await client.get('https://example.com/protected')
+    # All requests will include Authorization header
+    response = await client.request('GET', 'https://example.com/protected')
 ```
 
 ### Token Authentication
@@ -170,11 +198,13 @@ async with client:
 ```python
 from auth import Bearer
 
+# Create Bearer token authentication
 auth = Bearer('your-access-token')
 client = CrawlPy(auth=auth)
 
 async with client:
-    response = await client.get('https://api.example.com/data')
+    # Sends "Authorization: Bearer your-access-token"
+    response = await client.request('GET', 'https://api.example.com/data')
 ```
 
 ### JWT Authentication
@@ -182,11 +212,13 @@ async with client:
 ```python
 from auth import JWT
 
+# Create JWT authentication with token validation
 auth = JWT('your-jwt-token')
 client = CrawlPy(auth=auth)
 
 async with client:
-    response = await client.get('https://api.example.com/secure')
+    # Validates and sends JWT token
+    response = await client.request('GET', 'https://api.example.com/secure')
 ```
 
 ### API Key Authentication
@@ -194,11 +226,13 @@ async with client:
 ```python
 from auth import Key
 
+# Send API key in custom header
 auth = Key('your-api-key', place='header', name='X-API-Key')
 client = CrawlPy(auth=auth)
 
 async with client:
-    response = await client.get('https://api.example.com/data')
+    # Sends "X-API-Key: your-api-key" header
+    response = await client.request('GET', 'https://api.example.com/data')
 ```
 
 ### OAuth Authentication
@@ -206,6 +240,7 @@ async with client:
 ```python
 from auth import OAuth
 
+# Create OAuth 2.0 client credentials authentication
 auth = OAuth(
     client='your-client-id',
     secret='your-client-secret',
@@ -214,29 +249,30 @@ auth = OAuth(
 client = CrawlPy(auth=auth)
 
 async with client:
-    response = await client.get('https://api.example.com/data')
+    # Automatically handles token acquisition and refresh
+    response = await client.request('GET', 'https://api.example.com/data')
 ```
 
 ## Response Handling
 
 ```python
 async with CrawlPy() as client:
-    response = await client.get('https://httpbin.org/json')
+    response = await client.request('GET', 'https://httpbin.org/json')
 
-    # Status and metadata
-    print(response.status)      # 200
-    print(response.reason)      # 'OK'
+    # Access response metadata
+    print(response.status)      # HTTP status code (200)
+    print(response.reason)      # Status reason phrase ('OK')
     print(response.url)         # Final URL after redirects
-    print(response.headers)     # Headers dictionary
-    print(response.cookies)     # Cookies dictionary
-    print(response.type)        # Content-Type header
+    print(response.headers)     # Response headers as dict
+    print(response.cookies)     # Response cookies as dict
+    print(response.type)        # Content-Type header value
 
-    # Content formats
-    text = await response.text()        # String content
+    # Get response content in different formats
+    text = await response.text()        # Decoded text content
     data = await response.content()     # Raw bytes
-    json = await response.json()        # Parsed JSON
+    json = await response.json()        # Parsed JSON object
 
-    # Error check
+    # Check for HTTP errors
     if response.status >= 400:
         print(f"Error: {response.status} - {response.reason}")
 ```
@@ -247,9 +283,10 @@ async with CrawlPy() as client:
 
 ```python
 async with CrawlPy() as client:
-    # Stream large downloads
+    # Create streaming download for large files to avoid memory overhead
     stream = await client.stream('GET', 'https://example.com/large-file.zip')
     if stream:
+        # Write chunks to file as they arrive
         with open('large-file.zip', 'wb') as file:
             async for chunk in stream.read():
                 file.write(chunk)
@@ -259,13 +296,14 @@ async with CrawlPy() as client:
 
 ```python
 async with CrawlPy() as client:
-    # Stream large uploads
+    # Create streaming upload without loading entire file into memory
     stream = await client.stream(
         'POST', 
         'https://example.com/upload',
         headers={'Content-Type': 'application/octet-stream'}
     )
     if stream:
+        # Stream file content in chunks
         with open('huge-file.dat', 'rb') as file:
             await stream.write(file.read())
         response = stream.response()
@@ -274,14 +312,14 @@ async with CrawlPy() as client:
 ## Cookies
 
 ```python
-# Set cookies for all requests
+# Set default cookies for all requests
 client = CrawlPy(cookies={'session': 'abc123', 'user': 'alice'})
 
 async with client:
-    # Per-request cookies
-    response = await client.get('https://example.com', cookies={'temp': 'value'})
+    # Add additional cookies for specific request
+    response = await client.request('GET', 'https://example.com', cookies={'temp': 'value'})
 
-    # Access response cookies
+    # Extract cookies from response for future use
     if response.cookies:
         token = response.cookies.get('token')
 ```
@@ -291,11 +329,11 @@ async with client:
 ```python
 from settings import Proxy
 
-# Basic proxy
+# Basic proxy configuration
 proxy = Proxy(host='proxy.example.com', port=8080)
 client = CrawlPy(proxy=proxy)
 
-# Proxy with authentication
+# Proxy with authentication and custom headers
 proxy = Proxy(
     host='proxy.example.com',
     port=8080,
@@ -311,7 +349,7 @@ client = CrawlPy(proxy=proxy)
 ```python
 from settings import SSL
 
-# Custom SSL with certificate verification
+# Custom SSL with client certificates
 ssl = SSL(
     verify=True,
     cert='/path/to/client.crt',
@@ -320,7 +358,7 @@ ssl = SSL(
 )
 client = CrawlPy(ssl=ssl)
 
-# SSL with custom ciphers
+# SSL with custom cipher suites for security
 ssl = SSL(
     verify=True,
     ciphers='ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS'
@@ -337,50 +375,46 @@ client = CrawlPy(ssl=ssl)
 ```python
 from crawlpy import CrawlPy
 
-async def safe_request():
-    client = CrawlPy()
-    
-    try:
-        async with client:
-            response = await client.get('https://example.com/data')
-            if response:
-                data = await response.json()
-                return data
-            else:
-                print("Request failed")
-                return None
-                
-    except Exception as error:
-        print(f"Request error: {error}")
+# CrawlPy returns None on failure instead of raising exceptions
+async with CrawlPy() as client:
+    response = await client.request('GET', 'https://example.com/data')
+    if response:
+        data = await response.json()
+        return data
+    else:
+        print("Request failed - check warnings for details")
         return None
 ```
 
-**Note:** CrawlPy uses warning-based error handling. Failed requests return `None` and emit warnings rather than raising exceptions.
+> **Note:** CrawlPy uses warning-based error handling. Failed requests return `None` and emit warnings rather than raising exceptions.
 
 ## Base URL with Relative Paths
 
 ```python
-# Set base endpoint
+# Set base endpoint for all requests
 client = CrawlPy(endpoint='https://api.example.com/v1')
 
 async with client:
-    # All requests use base endpoint
-    users = await client.get('/users')          # GET https://api.example.com/v1/users
-    user = await client.get('/users/123')       # GET https://api.example.com/v1/users/123
-    posts = await client.get('/posts')          # GET https://api.example.com/v1/posts
+    # All requests automatically use the base endpoint
+    users = await client.request('GET', '/users')          # GET https://api.example.com/v1/users
+    user = await client.request('GET', '/users/123')       # GET https://api.example.com/v1/users/123
+    posts = await client.request('GET', '/posts')          # GET https://api.example.com/v1/posts
 ```
 
 ## Hooks
 
 ```python
 def agent(request):
+    """Add User-Agent header to all outgoing requests."""
     request.headers['User-Agent'] = 'CrawlPy/1.0'
     return request
 
 def address(response):
+    """Add forwarding header to all incoming responses."""
     response.headers['X-Forwarded-For'] = '127.0.0.1'
     return response
 
+# Configure request and response hooks for automatic transformations
 client = CrawlPy(hooks={
     'request': agent,
     'response': address
