@@ -62,4 +62,6 @@ class HTTPAdapter:
 
         # Ensure maximum doesn't exceed pool size significantly
         if self.maximum > self.pool * 10:
-            raise ValueError("Maximum requests should not exceed pool size by more than 10x")
+            raise ValueError(
+                "Maximum requests should not exceed pool size by more than 10x"
+            )

@@ -69,7 +69,9 @@ class SSL:
     key: Optional[str] = None  # Path to client private key file
     bundle: Optional[str] = None  # Path to custom CA bundle file
     ciphers: Optional[str] = None  # Allowed SSL cipher suites
-    context: Optional[Union[ssl.SSLContext, bool]] = None  # SSL context object or False to disable
+    context: Optional[Union[ssl.SSLContext, bool]] = (
+        None  # SSL context object or False to disable
+    )
 
     def __post_init__(self) -> None:
         """Initialize SSL context based on configuration.
