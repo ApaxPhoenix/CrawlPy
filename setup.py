@@ -1,4 +1,3 @@
-# Import required modules from setuptools for package configuration
 from setuptools import setup, find_packages
 
 # Package configuration and metadata
