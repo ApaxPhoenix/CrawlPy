@@ -15,12 +15,6 @@
 * **SSL Configuration** - Custom SSL contexts and certificates
 * **Request/Response Hooks** - Transform requests/responses
 
-## Installation
-
-```bash
-pip install crawlpy
-```
-
 ## Quick Start Guide
 
 This example demonstrates the basic usage pattern. The library uses async context managers to ensure proper resource cleanup and connection pooling:

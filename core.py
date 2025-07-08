@@ -3,10 +3,10 @@ import asyncio
 import warnings
 from typing import Optional, Dict, Union, Callable
 from urllib.parse import urlparse
-from broadcast import Stream, Response
-from settings import SSL, Proxy
-from auth import Basic, Bearer, JWT, Key, OAuth
-from config import Redirects, Retry, Limits, Timeout
+from .broadcast import Stream, Response
+from .settings import SSL, Proxy
+from .auth import Basic, Bearer, JWT, Key, OAuth
+from .config import Redirects, Retry, Limits, Timeout
 
 
 class CrawlCore:

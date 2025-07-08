@@ -1,10 +1,10 @@
 from typing import Optional, Dict, Any, Union, Callable
 import aiohttp
-from crawlpy import CrawlPy
-from config import Limits, Retry, Timeout, Redirects
-from settings import SSL, Proxy
-from broadcast import Response, Stream
-from auth import Basic, Bearer, JWT, Key, OAuth
+from .crawlpy import CrawlPy
+from .config import Limits, Retry, Timeout, Redirects
+from .settings import SSL, Proxy
+from .broadcast import Response, Stream
+from .auth import Basic, Bearer, JWT, Key, OAuth
 
 
 class Session(CrawlPy):
@@ -18,6 +18,7 @@ class Session(CrawlPy):
         headers: Dictionary of default headers for all requests.
         cookies: Dictionary of cookies to include in all requests.
         hooks: Dictionary of event hooks for request/response processing.
+        adapters: Dictionary of URL prefix to HTTPAdapter mappings.
     """
 
     def __init__(
@@ -69,6 +70,19 @@ class Session(CrawlPy):
         self.headers: Dict[str, str] = headers or {}
         self.cookies: Dict[str, str] = cookies or {}
         self.hooks: Dict[str, Callable[..., Any]] = hooks or {}
+        self.adapters: Dict[str, Any] = {}
+
+    def mount(self, prefix: str, adapter: Any) -> None:
+        """Mount an HTTPAdapter instance for a specific URL prefix.
+
+        Args:
+            prefix: URL prefix to match (e.g., 'https://api.example.com/')
+            adapter: HTTPAdapter instance to use for matching URLs
+
+        Returns:
+            None
+        """
+        self.adapters[prefix] = adapter
 
     async def get(
         self,

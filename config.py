@@ -38,6 +38,11 @@ class Limits:
         This validation prevents common configuration errors that
         could lead to poor performance or resource exhaustion.
 
+        The validation ensures:
+        - All values are positive (negative connections don't make sense)
+        - Keepalive doesn't exceed total (can't keep more than we have)
+        - Per-host doesn't exceed total (logical constraint)
+
         Returns:
             None
 
