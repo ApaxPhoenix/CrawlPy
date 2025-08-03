@@ -80,14 +80,14 @@ async with CrawlPy() as client:
     response = await client.post('https://example.com/login', data={'username': 'alice', 'password': 'secret'})
 
     # File upload (automatically sets Content-Type: multipart/form-data)
-    files = {'document': open('report.pdf', 'rb')}
+    files = {'document': open('report.pdf', 'rb')}  # Open file in binary read mode
     response = await client.post('https://example.com/upload', files=files)
 
     # Mixed form data and files
     response = await client.post(
         'https://example.com/submit',
-        data={'title': 'My Document'},
-        files={'file': open('document.pdf', 'rb')}
+        data={'title': 'My Document'},  # Form fields
+        files={'file': open('document.pdf', 'rb')}  # File attachment
     )
 ```
 
@@ -280,8 +280,8 @@ async with CrawlPy() as client:
     # Stream large downloads
     stream = await client.stream('GET', 'https://example.com/large-file.zip')
     if stream:
-        with open('large-file.zip', 'wb') as file:
-            async for chunk in stream:
+        with open('large-file.zip', 'wb') as file:  # Open file in write-binary mode
+            async for chunk in stream:  # Process data in chunks
                 file.write(chunk)
 ```
 
@@ -298,9 +298,9 @@ async with CrawlPy() as client:
         headers={'Content-Type': 'application/octet-stream'}
     )
     if stream:
-        with open('huge-file.dat', 'rb') as file:
-            await stream.write(file.read())
-        response = await stream.finish()
+        with open('huge-file.dat', 'rb') as file:  # Open file in read-binary mode
+            await stream.write(file.read())  # Stream file contents
+        response = await stream.finish()  # Complete the upload
 ```
 
 ## Cookie Management
@@ -402,15 +402,15 @@ Transform requests and responses with middleware functions:
 
 ```python
 def agent(request):
-    request.headers['User-Agent'] = 'CrawlPy/1.0'
+    request.headers['User-Agent'] = 'CrawlPy/1.0'  # Set custom user agent
     return request
 
 def log(response):
-    print(f"Response: {response.status} - {response.url}")
+    print(f"Response: {response.status} - {response.url}")  # Log response details
     return response
 
 client = CrawlPy(hooks={
-    'request': agent,
-    'response': log
+    'request': agent,   # Apply to outgoing requests
+    'response': log     # Apply to incoming responses
 })
 ```
