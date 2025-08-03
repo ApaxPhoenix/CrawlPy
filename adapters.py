@@ -1,8 +1,8 @@
 from typing import Optional, Dict, Union
 from dataclasses import dataclass
-from .config import Retry, Timeout
-from .settings import SSL, Proxy
-from .auth import Basic, Bearer, JWT, Key, OAuth
+from config import Retry, Timeout
+from settings import SSL, Proxy
+from auth import Basic, Bearer, JWT, Key, OAuth
 
 
 @dataclass

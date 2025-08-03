@@ -64,27 +64,27 @@ class SSL:
         context: SSL context object or False to disable SSL verification.
     """
 
-    verify: bool = True  # Whether to verify SSL certificates
+    verify: bool = False  # Whether to verify SSL certificates
     cert: Optional[str] = None  # Path to client certificate file
     key: Optional[str] = None  # Path to client private key file
     bundle: Optional[str] = None  # Path to custom CA bundle file
     ciphers: Optional[str] = None  # Allowed SSL cipher suites
-    context: Optional[Union[ssl.SSLContext, bool]] = (
-        None  # SSL context object or False to disable
-    )
+    context: Optional[Union[ssl.SSLContext, bool]] = None  # SSL context object or False to disable
 
     def __post_init__(self) -> None:
         """Initialize SSL context based on configuration.
 
-
         Returns:
             None
         """
+        # If context is already explicitly set, don't override it
+        if self.context is not None:
+            return
+
         # Check if any advanced SSL configuration is provided
-        # If not, use simple verification settings
         if not any([self.cert, self.key, self.bundle, self.ciphers]):
-            # Set context to None for normal verification, False to disable
-            self.context = None if self.verify else False
+            # Set context to False to disable verification, None for default verification
+            self.context = False if not self.verify else None
             return
 
         # Create default SSL context with secure settings

@@ -1,11 +1,11 @@
 import aiohttp
 import warnings
 from typing import Optional, Any, Dict, Union
-from .core import CrawlCore
-from .config import Limits, Retry, Timeout, Redirects
-from .settings import SSL, Proxy
-from .auth import Basic, Bearer, JWT, Key, OAuth
-from .broadcast import Response, Stream
+from core import CrawlCore
+from config import Limits, Retry, Timeout, Redirects
+from settings import SSL, Proxy
+from auth import Basic, Bearer, JWT, Key, OAuth
+from broadcast import Response, Stream
 
 
 class CrawlPy:

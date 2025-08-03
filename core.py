@@ -3,10 +3,10 @@ import asyncio
 import warnings
 from typing import Optional, Dict, Union, Callable
 from urllib.parse import urlparse
-from .broadcast import Stream, Response
-from .settings import SSL, Proxy
-from .auth import Basic, Bearer, JWT, Key, OAuth
-from .config import Redirects, Retry, Limits, Timeout
+from broadcast import Stream, Response
+from settings import SSL, Proxy
+from auth import Basic, Bearer, JWT, Key, OAuth
+from config import Redirects, Retry, Limits, Timeout
 
 
 class CrawlCore:
@@ -23,17 +23,17 @@ class CrawlCore:
     """
 
     def __init__(
-        self,
-        endpoint: str,
-        limits: Optional[Limits] = None,
-        retry: Optional[Retry] = None,
-        timeout: Optional[Timeout] = None,
-        redirects: Optional[Redirects] = None,
-        proxy: Optional[Proxy] = None,
-        ssl: Optional[SSL] = None,
-        auth: Optional[Union[Basic, Bearer, JWT, Key, OAuth]] = None,
-        cookies: Optional[Dict[str, str]] = None,
-        hooks: Optional[Dict[str, Callable]] = None,
+            self,
+            endpoint: str,
+            limits: Optional[Limits] = None,
+            retry: Optional[Retry] = None,
+            timeout: Optional[Timeout] = None,
+            redirects: Optional[Redirects] = None,
+            proxy: Optional[Proxy] = None,
+            ssl: Optional[SSL] = None,
+            auth: Optional[Union[Basic, Bearer, JWT, Key, OAuth]] = None,
+            cookies: Optional[Dict[str, str]] = None,
+            hooks: Optional[Dict[str, Callable]] = None,
     ) -> None:
         """
         Initialize the HTTP client with a base endpoint URL and configuration.
@@ -89,22 +89,6 @@ class CrawlCore:
         self.hooks = hooks or {}
         self.auth = auth
 
-        # Validate proxy configuration if provided
-        # All proxy parameters must be valid for connection to work
-        if self.proxy:
-            if not (
-                bool(self.proxy.host.strip())
-                and 1 <= self.proxy.port <= 65535
-                and (not self.proxy.username or bool(self.proxy.username.strip()))
-                and (not self.proxy.password or bool(self.proxy.password.strip()))
-            ):
-                raise ValueError("Invalid proxy configuration")
-
-        # Validate SSL configuration if provided
-        # SSL context must be properly configured or None
-        if self.ssl and not self.ssl.context is not None:
-            raise ValueError("Invalid SSL configuration")
-
         # Initialize session as None - will be created in __aenter__
         # This allows proper async context manager usage
         self.session: Optional[aiohttp.ClientSession] = None
@@ -112,34 +96,15 @@ class CrawlCore:
     async def __aenter__(self) -> "CrawlCore":
         """
         Asynchronously enter the context manager and initialize the HTTP session.
-
-        This method sets up the aiohttp ClientSession for making requests.
-        The session manages connection pooling, cookies, and other HTTP features.
-
-        The session is only created once and reused for all requests within
-        the context manager scope, providing efficient connection pooling.
-
-        Returns:
-            CrawlCore: The initialized CrawlCore instance
-
-        Raises:
-            ValueError: If the endpoint protocol is not HTTP or HTTPS
         """
-        # Only create session if it doesn't exist
-        # This prevents multiple session creation in nested contexts
         if not self.session:
-            # Parse the endpoint URL to extract scheme
-            # This is used for protocol validation
             parsed = urlparse(self.endpoint)
             scheme = parsed.scheme.lower()
 
-            # Validate protocol scheme
-            # Only HTTP and HTTPS are supported protocols
             if scheme not in ["http", "https"]:
                 raise ValueError("Only HTTP and HTTPS protocols are supported.")
 
             # Create TCP connector with connection limits from dataclass
-            # This manages the connection pool and keep-alive behavior
             connector = aiohttp.TCPConnector(
                 limit=self.limits.connections,
                 limit_per_host=self.limits.host,
@@ -147,22 +112,18 @@ class CrawlCore:
                 enable_cleanup_closed=True,
             )
 
-            # Configure SSL context with enhanced security validation
-            # This applies custom SSL settings if provided
-            if self.ssl.context:
-                # Use the configured SSL context
-                # This allows custom certificate validation
+            # Configure SSL context
+            if self.ssl.context is not None:
+                # Use the configured SSL context (could be False to disable SSL verification)
                 connector._ssl = self.ssl.context
 
-                # Warn if using insecure SSL configuration
-                # This helps identify potential security issues
-                if self.ssl.verify or self.ssl.context is False:
+                # Warn if SSL verification is disabled
+                if self.ssl.context is False or not self.ssl.verify:
                     warnings.warn(
                         "SSL verification is disabled - connection is vulnerable to attacks"
                     )
 
             # Create timeout configuration from dataclass
-            # This sets up comprehensive timeout handling
             timeout = aiohttp.ClientTimeout(
                 total=self.timeout.pool,
                 connect=self.timeout.connect,
@@ -171,7 +132,6 @@ class CrawlCore:
             )
 
             # Create HTTP session with connector and default timeout
-            # This is the core session used for all HTTP requests
             self.session = aiohttp.ClientSession(connector=connector, timeout=timeout)
         return self
 
@@ -197,13 +157,13 @@ class CrawlCore:
             self.session = None
 
     async def request(
-        self,
-        method: str,
-        url: str,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
-        redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-        **kwargs,
+            self,
+            method: str,
+            url: str,
+            timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+            redirects: Optional[bool] = None,
+            cookies: Optional[Dict[str, str]] = None,
+            **kwargs,
     ) -> Optional[Response]:
         """
         Send an HTTP request using the specified method and URL with comprehensive error handling and retry logic.
@@ -225,68 +185,65 @@ class CrawlCore:
         Raises:
             RuntimeError: If the session is not initialized (not used in async with block)
         """
-        # Ensure session is initialized
-        # This prevents usage outside of async context manager
+        # Ensure session is initialized before making any requests
         if not self.session:
             raise RuntimeError(
                 "CrawlCore session is not initialized. Use it within an 'async with' block."
             )
 
-        # Apply authentication
-        # Authentication is applied to headers or query parameters based on type
-        headers = kwargs.get("headers", {})
+        # Extract headers and params from kwargs for authentication
+        heads = kwargs.get("headers", {})
         params = kwargs.get("params", {})
 
+        # Apply authentication headers or parameters based on auth type
         if self.auth:
-            # Apply authentication headers based on type
-            # Each auth type has specific header format requirements
             if isinstance(self.auth, Basic):
-                headers["Authorization"] = self.auth.auth
+                # Add Basic authentication header
+                heads["Authorization"] = self.auth.auth
             elif isinstance(self.auth, Bearer):
-                headers["Authorization"] = self.auth.auth
+                # Add Bearer token authentication header
+                heads["Authorization"] = self.auth.auth
             elif isinstance(self.auth, JWT):
-                headers["Authorization"] = self.auth.auth
+                # Add JWT authentication header
+                heads["Authorization"] = self.auth.auth
             elif isinstance(self.auth, Key):
-                # API keys can be in headers or query parameters
+                # Add API key to header or query parameter based on configuration
                 if self.auth.place == "header":
-                    headers[self.auth.name] = self.auth.value
+                    heads[self.auth.name] = self.auth.value
                 elif self.auth.place == "query":
                     params[self.auth.name] = self.auth.value
             elif isinstance(self.auth, OAuth):
-                # OAuth requires token validation
+                # Add OAuth token if available
                 if self.auth.token:
-                    headers["Authorization"] = self.auth.auth
+                    heads["Authorization"] = self.auth.auth
 
-        # Update kwargs with authentication data
-        # This ensures authentication is applied to the request
-        kwargs["headers"] = headers
+        # Update kwargs with modified headers and params
+        kwargs["headers"] = heads
         if params:
             kwargs["params"] = params
 
-        # Merge cookies (request cookies override instance cookies)
-        # This allows per-request cookie customization
+        # Merge instance cookies with request-specific cookies
         merged = self.cookies.copy()
         if cookies:
             merged.update(cookies)
         if merged:
             kwargs["cookies"] = merged
 
-        # Execute request hook if provided
-        # This allows custom request processing before sending
+        # Execute pre-request hook if configured
         if "request" in self.hooks:
             try:
                 await self.hooks["request"](method, url, **kwargs)
-            except Exception as error:
-                warnings.warn(f"Request hook failed: {error}")
+            except Exception as err:
+                # Log hook failure but continue with request
+                warnings.warn(f"Request hook failed: {err}")
 
         # Handle timeout parameter conversion
-        # This normalizes timeout formats for aiohttp
         if timeout is not None:
             if isinstance(timeout, (int, float)):
-                # Convert simple timeout to ClientTimeout
+                # Convert simple timeout to ClientTimeout object
                 timeout = aiohttp.ClientTimeout(total=timeout)
             elif not isinstance(timeout, aiohttp.ClientTimeout):
-                # Use default timeout from dataclass
+                # Use default timeout configuration
                 timeout = aiohttp.ClientTimeout(
                     total=self.timeout.pool,
                     connect=self.timeout.connect,
@@ -295,41 +252,31 @@ class CrawlCore:
                 )
             kwargs["timeout"] = timeout
 
-        # Handle redirect parameters using dataclass values
-        # This configures redirect behavior for the request
+        # Handle redirect configuration
         if redirects is not None:
             kwargs["allow_redirects"] = redirects
         kwargs["max_redirects"] = self.redirects.limit
 
-        # Build full URL from endpoint and relative path
-        # This handles both absolute and relative URLs
+        # Build full URL by prepending endpoint if URL is relative
         if url.startswith("/"):
             url = self.endpoint + url
 
-        # Attempt request with retry logic using dataclass values
-        # This implements exponential backoff for failed requests
+        # Attempt request with retry logic and exponential backoff
         for attempt in range(self.retry.total + 1):
             try:
-                # Set up proxy
-                # Proxy configuration is validated and applied per request
+                # Configure proxy if specified
                 if self.proxy:
-                    # Validate proxy before use
-                    # This prevents invalid proxy configurations from causing errors
+                    # Validate proxy configuration
                     if not (
-                        bool(self.proxy.host.strip())
-                        and 1 <= self.proxy.port <= 65535
-                        and (
-                            not self.proxy.username or bool(self.proxy.username.strip())
-                        )
-                        and (
-                            not self.proxy.password or bool(self.proxy.password.strip())
-                        )
+                            bool(self.proxy.host.strip())
+                            and 1 <= self.proxy.port <= 65535
+                            and (not self.proxy.username or bool(self.proxy.username.strip()))
+                            and (not self.proxy.password or bool(self.proxy.password.strip()))
                     ):
                         warnings.warn("Invalid proxy configuration detected")
                         break
 
-                    # Generate proxy URL
-                    # This creates the proxy URL with optional authentication
+                    # Set up authenticated or anonymous proxy connection
                     if self.proxy.username and self.proxy.password:
                         kwargs["proxy"] = (
                             f"http://{self.proxy.username}:{self.proxy.password}@{self.proxy.host}:{self.proxy.port}"
@@ -339,113 +286,108 @@ class CrawlCore:
                         kwargs["proxy"] = f"http://{self.proxy.host}:{self.proxy.port}"
                         warnings.warn("Using anonymous proxy connection")
 
-                    # Add proxy headers if configured
-                    # This allows custom proxy headers to be sent
+                    # Add proxy-specific headers if configured
                     if self.proxy.headers:
-                        headers = kwargs.get("headers", {})
-                        headers.update(self.proxy.headers)
-                        kwargs["headers"] = headers
+                        heads = kwargs.get("headers", {})
+                        heads.update(self.proxy.headers)
+                        kwargs["headers"] = heads
 
-                # Make HTTP request using session
-                # This is the actual HTTP request execution
-                async with self.session.request(method, url, **kwargs) as response:
-                    # Check if we should retry based on status code from dataclass
-                    # This handles retryable HTTP status codes
+                # Make the actual HTTP request using aiohttp session
+                async with self.session.request(method, url, **kwargs) as resp:
+                    # Check if we should retry based on response status code
                     if (
-                        response.status in self.retry.status
-                        and attempt < self.retry.total
+                            resp.status in self.retry.status
+                            and attempt < self.retry.total
                     ):
                         warnings.warn(
-                            f"Request failed with status {response.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
+                            f"Request failed with status {resp.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                         )
-                        # Calculate exponential backoff delay using dataclass value
-                        # This prevents overwhelming the server with rapid retries
-                        delay = self.retry.backoff * (2**attempt)
+                        # Calculate exponential backoff delay
+                        delay = self.retry.backoff * (2 ** attempt)
                         await asyncio.sleep(delay)
                         continue
 
                     # Raise exception for HTTP error status codes
-                    # This handles HTTP error responses
-                    response.raise_for_status()
+                    resp.raise_for_status()
 
-                    # Create response object
-                    # This wraps the aiohttp response in our custom Response class
-                    response = Response(response)
+                    # Create response wrapper for enhanced functionality
+                    wrapper = Response(resp)
 
-                    # Execute response hook if provided
-                    # This allows custom response processing after receiving
+                    # CRITICAL: Pre-cache content to prevent connection closure issues
+                    # This ensures we can access response data even after the context manager exits
+                    try:
+                        # Read and cache the response content while connection is active
+                        await wrapper.bytes()
+                    except Exception as err:
+                        # Log caching failure but continue - user might handle connection issues
+                        warnings.warn(f"Failed to cache response content: {err}")
+
+                    # Execute post-response hook if configured
                     if "response" in self.hooks:
                         try:
-                            await self.hooks["response"](response)
-                        except Exception as error:
-                            warnings.warn(f"Response hook failed: {error}")
+                            await self.hooks["response"](wrapper)
+                        except Exception as err:
+                            # Log hook failure but continue with response
+                            warnings.warn(f"Response hook failed: {err}")
 
-                    return response
+                    return wrapper
 
-            except aiohttp.ClientResponseError as error:
+            except aiohttp.ClientResponseError as err:
                 # Handle HTTP response errors with retry logic
-                # This manages HTTP error status codes with retry capability
-                if error.status in self.retry.status and attempt < self.retry.total:
+                if err.status in self.retry.status and attempt < self.retry.total:
                     warnings.warn(
-                        f"Request failed with status {error.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
+                        f"Request failed with status {err.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                     )
-                    # Calculate exponential backoff delay using dataclass value
-                    # This implements exponential backoff for retryable errors
-                    delay = self.retry.backoff * (2**attempt)
+                    # Calculate exponential backoff delay
+                    delay = self.retry.backoff * (2 ** attempt)
                     await asyncio.sleep(delay)
                     continue
                 else:
-                    # Log final failure
-                    # This records the final failure after all retries
+                    # Max retries reached or status not in retry list
                     warnings.warn(
-                        f"Request failed with status {error.status}: {error.message}"
+                        f"Request failed with status {err.status}: {err.message}"
                     )
                     break
             except (
-                aiohttp.ClientConnectionError,
-                aiohttp.ServerTimeoutError,
-                aiohttp.ClientProxyConnectionError,
-            ) as error:
-                # Handle connection, timeout, and proxy errors
-                # These are network-level errors that may be retryable
+                    aiohttp.ClientConnectionError,
+                    aiohttp.ServerTimeoutError,
+                    aiohttp.ClientProxyConnectionError,
+            ) as err:
+                # Handle connection, timeout, and proxy errors with retry logic
                 if attempt < self.retry.total:
                     if (
-                        isinstance(error, aiohttp.ClientProxyConnectionError)
-                        and self.proxy
+                            isinstance(err, aiohttp.ClientProxyConnectionError)
+                            and self.proxy
                     ):
                         warnings.warn(
                             f"Proxy connection failed to {self.proxy.host}:{self.proxy.port}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                         )
                     else:
                         warnings.warn(
-                            f"Request failed with {error.__class__.__name__}, retrying... (attempt {attempt + 1}/{self.retry.total})"
+                            f"Request failed with {err.__class__.__name__}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                         )
-                    # Calculate exponential backoff delay using dataclass value
-                    # This implements exponential backoff for network errors
-                    delay = self.retry.backoff * (2**attempt)
+                    # Calculate exponential backoff delay
+                    delay = self.retry.backoff * (2 ** attempt)
                     await asyncio.sleep(delay)
                     continue
                 else:
-                    # Log final failure with proxy info if applicable
-                    # This provides detailed error information for debugging
+                    # Max retries reached - log final failure
                     if (
-                        isinstance(error, aiohttp.ClientProxyConnectionError)
-                        and self.proxy
+                            isinstance(err, aiohttp.ClientProxyConnectionError)
+                            and self.proxy
                     ):
                         warnings.warn(
-                            f"Proxy connection failed permanently to {self.proxy.host}:{self.proxy.port}: {error}"
+                            f"Proxy connection failed permanently to {self.proxy.host}:{self.proxy.port}: {err}"
                         )
                     else:
-                        warnings.warn(f"Request failed: {error}")
+                        warnings.warn(f"Request failed: {err}")
                     break
-            except Exception as error:
-                # Handle unexpected errors
-                # This catches any other exceptions that may occur
-                warnings.warn(f"An unexpected error occurred: {error}")
+            except Exception as err:
+                # Handle any unexpected errors
+                warnings.warn(f"An unexpected error occurred: {err}")
                 break
 
-        # Return None if all retries failed
-        # This indicates that the request could not be completed
+        # Return None if all retry attempts failed
         return None
 
     async def stream(
