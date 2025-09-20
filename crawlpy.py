@@ -1,11 +1,11 @@
 import aiohttp
 import warnings
 from typing import Optional, Any, Dict, Union, TypeVar, Awaitable, Callable
-from core import CrawlCore
-from config import Limits, Retry, Timeout, Redirects
-from settings import SSL, Proxy
-from auth import Basic, Bearer, JWT, Key, OAuth
-from broadcast import Response, Stream
+from .core import CrawlCore
+from .config import Limits, Retry, Timeout, Redirects
+from .settings import SSL, Proxy
+from .auth import Basic, Bearer, JWT, Key, OAuth
+from .broadcast import Response, Stream
 
 # Enhanced type definitions for improved type safety and clarity
 T = TypeVar("T")
