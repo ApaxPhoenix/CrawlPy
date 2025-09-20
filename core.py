@@ -1,12 +1,34 @@
 import aiohttp
 import asyncio
 import warnings
-from typing import Optional, Dict, Union, Callable
+from typing import Optional, Dict, Union, Callable, TypeVar, Awaitable, Any
 from urllib.parse import urlparse
-from .broadcast import Stream, Response
-from .settings import SSL, Proxy
-from .auth import Basic, Bearer, JWT, Key, OAuth
-from .config import Redirects, Retry, Limits, Timeout
+from broadcast import Stream, Response
+from settings import SSL, Proxy
+from auth import Basic, Bearer, JWT, Key, OAuth
+from config import Redirects, Retry, Limits, Timeout
+
+# Enhanced type definitions for improved type safety and clarity
+T = TypeVar("T")
+CrawlCoreType = TypeVar("CrawlCoreType", bound="CrawlCore")
+ResponseType = TypeVar("ResponseType", bound=Response)
+StreamType = TypeVar("StreamType", bound=Stream)
+AuthType = TypeVar("AuthType", bound=Union[Basic, Bearer, JWT, Key, OAuth])
+ConfigType = TypeVar("ConfigType")
+HookType = Callable[..., Awaitable[Any]]
+RequestHookType = Callable[[str, str], Awaitable[None]]
+ResponseHookType = Callable[[ResponseType], Awaitable[None]]
+StreamHookType = Callable[[StreamType], Awaitable[None]]
+SessionType = TypeVar("SessionType", bound=aiohttp.ClientSession)
+ConnectorType = TypeVar("ConnectorType", bound=aiohttp.TCPConnector)
+TimeoutType = Union[float, aiohttp.ClientTimeout]
+HeadersType = Dict[str, str]
+CookiesType = Dict[str, str]
+ParamsType = Dict[str, Any]
+HooksType = Dict[str, HookType]
+UrlType = str
+HttpMethod = str
+ProxyUrl = str
 
 
 class CrawlCore:
@@ -24,16 +46,16 @@ class CrawlCore:
 
     def __init__(
             self,
-            endpoint: str,
+            endpoint: UrlType,
             limits: Optional[Limits] = None,
             retry: Optional[Retry] = None,
             timeout: Optional[Timeout] = None,
             redirects: Optional[Redirects] = None,
             proxy: Optional[Proxy] = None,
             ssl: Optional[SSL] = None,
-            auth: Optional[Union[Basic, Bearer, JWT, Key, OAuth]] = None,
-            cookies: Optional[Dict[str, str]] = None,
-            hooks: Optional[Dict[str, Callable]] = None,
+            auth: Optional[AuthType] = None,
+            cookies: Optional[CookiesType] = None,
+            hooks: Optional[HooksType] = None,
     ) -> None:
         """
         Initialize the HTTP client with a base endpoint URL and configuration.
@@ -72,40 +94,40 @@ class CrawlCore:
 
         # Store core endpoint configuration
         # This will be used as the base URL for all requests
-        self.endpoint = endpoint
+        self.endpoint: UrlType = endpoint
 
         # Apply default configurations if not provided
         # Each configuration class provides sensible defaults
-        self.limits = limits or Limits()
-        self.retry = retry or Retry()
-        self.timeout = timeout or Timeout()
-        self.redirects = redirects or Redirects()
-        self.ssl = ssl or SSL()
+        self.limits: Limits = limits or Limits()
+        self.retry: Retry = retry or Retry()
+        self.timeout: Timeout = timeout or Timeout()
+        self.redirects: Redirects = redirects or Redirects()
+        self.ssl: SSL = ssl or SSL()
 
         # Store optional configurations
         # These may be None and will be handled appropriately
-        self.proxy = proxy
-        self.cookies = cookies or {}
-        self.hooks = hooks or {}
-        self.auth = auth
+        self.proxy: Optional[Proxy] = proxy
+        self.cookies: CookiesType = cookies or {}
+        self.hooks: HooksType = hooks or {}
+        self.auth: Optional[AuthType] = auth
 
         # Initialize session as None - will be created in __aenter__
         # This allows proper async context manager usage
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: Optional[SessionType] = None
 
-    async def __aenter__(self) -> "CrawlCore":
+    async def __aenter__(self) -> CrawlCoreType:
         """
         Asynchronously enter the context manager and initialize the HTTP session.
         """
         if not self.session:
             parsed = urlparse(self.endpoint)
-            scheme = parsed.scheme.lower()
+            scheme: str = parsed.scheme.lower()
 
             if scheme not in ["http", "https"]:
                 raise ValueError("Only HTTP and HTTPS protocols are supported.")
 
             # Create TCP connector with connection limits from dataclass
-            connector = aiohttp.TCPConnector(
+            connector: ConnectorType = aiohttp.TCPConnector(
                 limit=self.limits.connections,
                 limit_per_host=self.limits.host,
                 keepalive_timeout=30,
@@ -124,7 +146,7 @@ class CrawlCore:
                     )
 
             # Create timeout configuration from dataclass
-            timeout = aiohttp.ClientTimeout(
+            config: aiohttp.ClientTimeout = aiohttp.ClientTimeout(
                 total=self.timeout.pool,
                 connect=self.timeout.connect,
                 sock_read=self.timeout.read,
@@ -132,7 +154,7 @@ class CrawlCore:
             )
 
             # Create HTTP session with connector and default timeout
-            self.session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+            self.session = aiohttp.ClientSession(connector=connector, timeout=config)
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:
@@ -158,22 +180,22 @@ class CrawlCore:
 
     async def request(
             self,
-            method: str,
-            url: str,
-            timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+            method: HttpMethod,
+            endpoint: UrlType,
+            timeout: Optional[TimeoutType] = None,
             redirects: Optional[bool] = None,
-            cookies: Optional[Dict[str, str]] = None,
-            **kwargs,
-    ) -> Optional[Response]:
+            cookies: Optional[CookiesType] = None,
+            **kwargs: Any,
+    ) -> Optional[ResponseType]:
         """
-        Send an HTTP request using the specified method and URL with comprehensive error handling and retry logic.
+        Send an HTTP request using the specified method and endpoint with comprehensive error handling and retry logic.
 
         This method handles authentication, cookies, hooks, proxy configuration, and implements retry logic
         with exponential backoff for failed requests. It's the core method that all HTTP operations use.
 
         Args:
             method: HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
-            url: The target URL for the request
+            endpoint: The target endpoint for the request
             timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
             redirects: Whether to follow redirects (uses default if not provided)
             cookies: Cookies for this request (merged with instance cookies)
@@ -192,8 +214,8 @@ class CrawlCore:
             )
 
         # Extract headers and params from kwargs for authentication
-        heads = kwargs.get("headers", {})
-        params = kwargs.get("params", {})
+        heads: HeadersType = kwargs.get("headers", {})
+        params: ParamsType = kwargs.get("params", {})
 
         # Apply authentication headers or parameters based on auth type
         if self.auth:
@@ -223,7 +245,7 @@ class CrawlCore:
             kwargs["params"] = params
 
         # Merge instance cookies with request-specific cookies
-        merged = self.cookies.copy()
+        merged: CookiesType = self.cookies.copy()
         if cookies:
             merged.update(cookies)
         if merged:
@@ -232,10 +254,10 @@ class CrawlCore:
         # Execute pre-request hook if configured
         if "request" in self.hooks:
             try:
-                await self.hooks["request"](method, url, **kwargs)
-            except Exception as err:
+                await self.hooks["request"](method, endpoint, **kwargs)
+            except Exception as error:
                 # Log hook failure but continue with request
-                warnings.warn(f"Request hook failed: {err}")
+                warnings.warn(f"Request hook failed: {error}")
 
         # Handle timeout parameter conversion
         if timeout is not None:
@@ -258,8 +280,8 @@ class CrawlCore:
         kwargs["max_redirects"] = self.redirects.limit
 
         # Build full URL by prepending endpoint if URL is relative
-        if url.startswith("/"):
-            url = self.endpoint + url
+        if endpoint.startswith("/"):
+            endpoint = self.endpoint + endpoint
 
         # Attempt request with retry logic and exponential backoff
         for attempt in range(self.retry.total + 1):
@@ -277,14 +299,17 @@ class CrawlCore:
                         break
 
                     # Set up authenticated or anonymous proxy connection
+                    url: ProxyUrl
                     if self.proxy.username and self.proxy.password:
-                        kwargs["proxy"] = (
+                        url = (
                             f"http://{self.proxy.username}:{self.proxy.password}@{self.proxy.host}:{self.proxy.port}"
                         )
                         warnings.warn("Using authenticated proxy connection")
                     else:
-                        kwargs["proxy"] = f"http://{self.proxy.host}:{self.proxy.port}"
+                        url = f"http://{self.proxy.host}:{self.proxy.port}"
                         warnings.warn("Using anonymous proxy connection")
+
+                    kwargs["proxy"] = url
 
                     # Add proxy-specific headers if configured
                     if self.proxy.headers:
@@ -293,7 +318,7 @@ class CrawlCore:
                         kwargs["headers"] = heads
 
                 # Make the actual HTTP request using aiohttp session
-                async with self.session.request(method, url, **kwargs) as resp:
+                async with self.session.request(method, endpoint, **kwargs) as resp:
                     # Check if we should retry based on response status code
                     if (
                             resp.status in self.retry.status
@@ -303,7 +328,7 @@ class CrawlCore:
                             f"Request failed with status {resp.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                         )
                         # Calculate exponential backoff delay
-                        delay = self.retry.backoff * (2 ** attempt)
+                        delay: float = self.retry.backoff * (2 ** attempt)
                         await asyncio.sleep(delay)
                         continue
 
@@ -311,32 +336,32 @@ class CrawlCore:
                     resp.raise_for_status()
 
                     # Create response wrapper for enhanced functionality
-                    wrapper = Response(resp)
+                    wrapper: ResponseType = Response(resp)
 
                     # CRITICAL: Pre-cache content to prevent connection closure issues
                     # This ensures we can access response data even after the context manager exits
                     try:
                         # Read and cache the response content while connection is active
                         await wrapper.bytes()
-                    except Exception as err:
+                    except Exception as error:
                         # Log caching failure but continue - user might handle connection issues
-                        warnings.warn(f"Failed to cache response content: {err}")
+                        warnings.warn(f"Failed to cache response content: {error}")
 
                     # Execute post-response hook if configured
                     if "response" in self.hooks:
                         try:
                             await self.hooks["response"](wrapper)
-                        except Exception as err:
+                        except Exception as error:
                             # Log hook failure but continue with response
-                            warnings.warn(f"Response hook failed: {err}")
+                            warnings.warn(f"Response hook failed: {error}")
 
                     return wrapper
 
-            except aiohttp.ClientResponseError as err:
+            except aiohttp.ClientResponseError as error:
                 # Handle HTTP response errors with retry logic
-                if err.status in self.retry.status and attempt < self.retry.total:
+                if error.status in self.retry.status and attempt < self.retry.total:
                     warnings.warn(
-                        f"Request failed with status {err.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
+                        f"Request failed with status {error.status}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                     )
                     # Calculate exponential backoff delay
                     delay = self.retry.backoff * (2 ** attempt)
@@ -345,18 +370,18 @@ class CrawlCore:
                 else:
                     # Max retries reached or status not in retry list
                     warnings.warn(
-                        f"Request failed with status {err.status}: {err.message}"
+                        f"Request failed with status {error.status}: {error.message}"
                     )
                     break
             except (
                     aiohttp.ClientConnectionError,
                     aiohttp.ServerTimeoutError,
                     aiohttp.ClientProxyConnectionError,
-            ) as err:
+            ) as error:
                 # Handle connection, timeout, and proxy errors with retry logic
                 if attempt < self.retry.total:
                     if (
-                            isinstance(err, aiohttp.ClientProxyConnectionError)
+                            isinstance(error, aiohttp.ClientProxyConnectionError)
                             and self.proxy
                     ):
                         warnings.warn(
@@ -364,7 +389,7 @@ class CrawlCore:
                         )
                     else:
                         warnings.warn(
-                            f"Request failed with {err.__class__.__name__}, retrying... (attempt {attempt + 1}/{self.retry.total})"
+                            f"Request failed with {error.__class__.__name__}, retrying... (attempt {attempt + 1}/{self.retry.total})"
                         )
                     # Calculate exponential backoff delay
                     delay = self.retry.backoff * (2 ** attempt)
@@ -373,31 +398,31 @@ class CrawlCore:
                 else:
                     # Max retries reached - log final failure
                     if (
-                            isinstance(err, aiohttp.ClientProxyConnectionError)
+                            isinstance(error, aiohttp.ClientProxyConnectionError)
                             and self.proxy
                     ):
                         warnings.warn(
-                            f"Proxy connection failed permanently to {self.proxy.host}:{self.proxy.port}: {err}"
+                            f"Proxy connection failed permanently to {self.proxy.host}:{self.proxy.port}: {error}"
                         )
                     else:
-                        warnings.warn(f"Request failed: {err}")
+                        warnings.warn(f"Request failed: {error}")
                     break
-            except Exception as err:
+            except Exception as error:
                 # Handle any unexpected errors
-                warnings.warn(f"An unexpected error occurred: {err}")
+                warnings.warn(f"An unexpected error occurred: {error}")
                 break
 
         # Return None if all retry attempts failed
         return None
 
     async def stream(
-        self,
-        method: str,
-        url: str,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
-        cookies: Optional[Dict[str, str]] = None,
-        **kwargs,
-    ) -> Stream:
+            self,
+            method: HttpMethod,
+            endpoint: UrlType,
+            timeout: Optional[TimeoutType] = None,
+            cookies: Optional[CookiesType] = None,
+            **kwargs: Any,
+    ) -> StreamType:
         """
         Send a streaming HTTP request for handling large data transfers.
 
@@ -413,7 +438,7 @@ class CrawlCore:
 
         Args:
             method: HTTP method for the streaming request
-            url: The target URL for the streaming request
+            endpoint: The target endpoint for the streaming request
             timeout: Request timeout (float for simple timeout, ClientTimeout for detailed control)
             cookies: Optional cookies as key-value pairs
             **kwargs: Additional arguments passed to aiohttp
@@ -436,8 +461,8 @@ class CrawlCore:
 
         # Apply authentication
         # Authentication is applied the same way as regular requests
-        headers = kwargs.get("headers", {})
-        params = kwargs.get("params", {})
+        headers: HeadersType = kwargs.get("headers", {})
+        params: ParamsType = kwargs.get("params", {})
 
         if self.auth:
             # Apply authentication headers based on type
@@ -467,7 +492,7 @@ class CrawlCore:
 
         # Merge cookies (request cookies override instance cookies)
         # This allows per-request cookie customization for streaming
-        merged = self.cookies.copy()
+        merged: CookiesType = self.cookies.copy()
         if cookies:
             merged.update(cookies)
         if merged:
@@ -495,21 +520,24 @@ class CrawlCore:
             # Validate proxy before use
             # This prevents invalid proxy configurations from causing errors
             if not (
-                bool(self.proxy.host.strip())
-                and 1 <= self.proxy.port <= 65535
-                and (not self.proxy.username or bool(self.proxy.username.strip()))
-                and (not self.proxy.password or bool(self.proxy.password.strip()))
+                    bool(self.proxy.host.strip())
+                    and 1 <= self.proxy.port <= 65535
+                    and (not self.proxy.username or bool(self.proxy.username.strip()))
+                    and (not self.proxy.password or bool(self.proxy.password.strip()))
             ):
                 raise ValueError("Invalid proxy configuration for streaming request")
 
             # Generate proxy URL
             # This creates the proxy URL with optional authentication
+            proxy_url: ProxyUrl
             if self.proxy.username and self.proxy.password:
-                kwargs["proxy"] = (
+                proxy_url = (
                     f"http://{self.proxy.username}:{self.proxy.password}@{self.proxy.host}:{self.proxy.port}"
                 )
             else:
-                kwargs["proxy"] = f"http://{self.proxy.host}:{self.proxy.port}"
+                proxy_url = f"http://{self.proxy.host}:{self.proxy.port}"
+
+            kwargs["proxy"] = proxy_url
 
             # Add proxy headers if configured
             # This allows custom proxy headers to be sent
@@ -525,21 +553,21 @@ class CrawlCore:
 
         # Build full URL from endpoint and relative path
         # This handles both absolute and relative URLs for streaming
-        if url.startswith("/"):
-            url = self.endpoint + url
+        if endpoint.startswith("/"):
+            endpoint = self.endpoint + endpoint
 
         # Execute request hook if provided
         # This allows custom request processing before streaming
         if "request" in self.hooks:
             try:
-                await self.hooks["request"](method, url, **kwargs)
+                await self.hooks["request"](method, endpoint, **kwargs)
             except Exception as error:
                 warnings.warn(f"Request hook failed: {error}")
 
         try:
             # Make streaming HTTP request
             # This creates the streaming connection
-            response = await self.session.request(method, url, **kwargs)
+            response: aiohttp.ClientResponse = await self.session.request(method, endpoint, **kwargs)
 
             # Raise exception for HTTP error status codes
             # This handles HTTP error responses for streaming
@@ -547,7 +575,7 @@ class CrawlCore:
 
             # Create stream wrapper
             # This wraps the aiohttp response in our custom Stream class
-            stream = Stream(response)
+            stream: StreamType = Stream(response)
 
             # Execute response hook if provided
             # This allows custom response processing for streaming
@@ -564,8 +592,8 @@ class CrawlCore:
             warnings.warn(f"Request failed with status {error.status}: {error.message}")
             raise
         except (
-            aiohttp.ClientConnectionError,
-            aiohttp.ClientProxyConnectionError,
+                aiohttp.ClientConnectionError,
+                aiohttp.ClientProxyConnectionError,
         ) as error:
             # Enhanced proxy error handling
             # This provides detailed error information for proxy issues

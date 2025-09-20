@@ -1,7 +1,24 @@
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TypeVar
 import base64
 import json
+import warnings
+
+# Enhanced type definitions for improved type safety and clarity
+BasicType = TypeVar("BasicType", bound="Basic")
+BearerType = TypeVar("BearerType", bound="Bearer")
+JWTType = TypeVar("JWTType", bound="JWT")
+KeyType = TypeVar("KeyType", bound="Key")
+OAuthType = TypeVar("OAuthType", bound="OAuth")
+CredentialsType = str
+TokenType = str
+AuthHeaderType = str
+JWTPayloadType = Dict[str, Any]
+APIKeyPlaceType = str
+APIKeyNameType = str
+ScopeType = str
+URLType = str
+TimestampType = int
 
 
 @dataclass
@@ -29,9 +46,9 @@ class Basic:
               Auto-generated if not provided during initialization.
     """
 
-    user: str
-    password: str
-    auth: str = ""
+    user: CredentialsType
+    password: CredentialsType
+    auth: AuthHeaderType = ""
 
     def __post_init__(self) -> None:
         """
@@ -46,14 +63,38 @@ class Basic:
         Returns:
             None
         """
+        # Validate credentials are not empty
+        if not self.user.strip():
+            raise ValueError("Username cannot be empty")
+        if not self.password.strip():
+            raise ValueError("Password cannot be empty")
+
         # Generate Basic auth header if not already provided
         if not self.auth:
             # Combine username and password with colon separator
-            credentials = f"{self.user}:{self.password}"
+            credentials: str = f"{self.user}:{self.password}"
             # Encode credentials in base64 as required by RFC 7617
-            encoded = base64.b64encode(credentials.encode()).decode()
+            encoded: str = base64.b64encode(credentials.encode()).decode()
             # Create complete authorization header
             self.auth = f"Basic {encoded}"
+
+        # Security warning about Basic authentication
+        warnings.warn(
+            "Basic authentication transmits credentials with every request. "
+            "Ensure connections use HTTPS to protect credentials in transit. "
+            "Consider using token-based authentication for better security.",
+            UserWarning,
+            stacklevel=3,
+        )
+
+        # Warning for weak passwords
+        if len(self.password) < 8:
+            warnings.warn(
+                f"Password is only {len(self.password)} characters long. "
+                "Consider using stronger passwords with at least 8 characters.",
+                UserWarning,
+                stacklevel=3,
+            )
 
 
 @dataclass
@@ -80,9 +121,9 @@ class Bearer:
               Auto-generated if not provided during initialization.
     """
 
-    token: str
+    token: TokenType
     scheme: str = "Bearer"
-    auth: str = ""
+    auth: AuthHeaderType = ""
 
     def __post_init__(self) -> None:
         """
@@ -97,10 +138,27 @@ class Bearer:
         Returns:
             None
         """
+        # Validate token is not empty
+        if not self.token.strip():
+            raise ValueError("Token cannot be empty")
+
+        # Validate scheme is not empty
+        if not self.scheme.strip():
+            raise ValueError("Scheme cannot be empty")
+
         # Generate Bearer auth header if not already provided
         if not self.auth:
             # Create authorization header with scheme and token
             self.auth = f"{self.scheme} {self.token}"
+
+        # Security warning for very short tokens
+        if len(self.token) < 16:
+            warnings.warn(
+                f"Token is only {len(self.token)} characters long. "
+                "Very short tokens may be less secure and easier to guess.",
+                UserWarning,
+                stacklevel=3,
+            )
 
 
 @dataclass
@@ -129,10 +187,10 @@ class JWT:
               Contains claims and metadata extracted from the token.
     """
 
-    token: str
+    token: TokenType
     scheme: str = "Bearer"
-    auth: str = ""
-    data: Optional[Dict[str, Any]] = None
+    auth: AuthHeaderType = ""
+    data: Optional[JWTPayloadType] = None
 
     def __post_init__(self) -> None:
         """
@@ -147,6 +205,20 @@ class JWT:
         Returns:
             None
         """
+        # Validate token is not empty
+        if not self.token.strip():
+            raise ValueError("JWT token cannot be empty")
+
+        # Validate token has correct JWT format (three parts separated by dots)
+        parts = self.token.split(".")
+        if len(parts) != 3:
+            warnings.warn(
+                "JWT token does not have the expected format (header.payload.signature). "
+                "This may not be a valid JWT token.",
+                UserWarning,
+                stacklevel=3,
+            )
+
         # Generate JWT auth header if not already provided
         if not self.auth:
             # Create authorization header with scheme and token
@@ -156,24 +228,38 @@ class JWT:
         if self.data is None:
             self.data = {}
             try:
-                # Split JWT token into parts (header.payload.signature)
-                parts = self.token.split(".")
+                # Extract payload part (second component)
                 if len(parts) >= 2:
-                    # Extract payload part (second component)
-                    part = parts[1]
+                    part: str = parts[1]
 
                     # Add base64 padding if necessary for proper decoding
-                    padding = 4 - len(part) % 4
+                    padding: int = 4 - len(part) % 4
                     if padding != 4:
                         part += "=" * padding
 
                     # Decode base64 payload and parse JSON
-                    decoded = base64.b64decode(part)
+                    decoded: bytes = base64.b64decode(part)
                     self.data = json.loads(decoded.decode())
+
+                    # Check for token expiration if present
+                    if 'exp' in self.data:
+                        import time
+                        current_time = int(time.time())
+                        if self.data['exp'] < current_time:
+                            warnings.warn(
+                                "JWT token appears to be expired based on 'exp' claim. "
+                                "Authentication may fail.",
+                                UserWarning,
+                                stacklevel=3,
+                            )
             except Exception:
                 # If JWT decoding fails, keep empty payload
                 # This prevents crashes with malformed tokens
-                pass
+                warnings.warn(
+                    "Failed to decode JWT payload. Token may be malformed.",
+                    UserWarning,
+                    stacklevel=3,
+                )
 
 
 @dataclass
@@ -200,9 +286,9 @@ class Key:
               Common names include "X-API-Key", "apikey", or "Authorization".
     """
 
-    value: str
-    place: str = "header"
-    name: str = "X-API-Key"
+    value: TokenType
+    place: APIKeyPlaceType = "header"
+    name: APIKeyNameType = "X-API-Key"
 
     def __post_init__(self) -> None:
         """
@@ -217,13 +303,36 @@ class Key:
         Raises:
             ValueError: If configuration values are invalid.
         """
+        # Validate API key value is not empty
+        if not self.value.strip():
+            raise ValueError("API key value cannot be empty")
+
         # Validate placement option
         if self.place not in ["header", "query"]:
             raise ValueError("Place must be 'header' or 'query'")
 
         # Validate name is not empty
-        if not self.name:
+        if not self.name.strip():
             raise ValueError("Name cannot be empty")
+
+        # Security warning for query parameter placement
+        if self.place == "query":
+            warnings.warn(
+                "API key is configured to be sent as a query parameter. "
+                "Query parameters may be logged in server logs and browser history. "
+                "Consider using header placement for better security.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning for short API keys
+        if len(self.value) < 16:
+            warnings.warn(
+                f"API key is only {len(self.value)} characters long. "
+                "Short API keys may be less secure and easier to guess.",
+                UserWarning,
+                stacklevel=3,
+            )
 
 
 @dataclass
@@ -259,14 +368,14 @@ class OAuth:
               Auto-generated from the current access token.
     """
 
-    client: str
-    secret: str
-    url: str
-    scope: Optional[str] = None
-    token: Optional[str] = None
-    refresh: Optional[str] = None
-    expires: Optional[int] = None
-    auth: str = ""
+    client: CredentialsType
+    secret: CredentialsType
+    url: URLType
+    scope: Optional[ScopeType] = None
+    token: Optional[TokenType] = None
+    refresh: Optional[TokenType] = None
+    expires: Optional[TimestampType] = None
+    auth: AuthHeaderType = ""
 
     def __post_init__(self) -> None:
         """
@@ -278,10 +387,55 @@ class OAuth:
         Returns:
             None
         """
+        # Validate required fields
+        if not self.client.strip():
+            raise ValueError("OAuth client ID cannot be empty")
+        if not self.secret.strip():
+            raise ValueError("OAuth client secret cannot be empty")
+        if not self.url.strip():
+            raise ValueError("OAuth token URL cannot be empty")
+
         # Initialize scope to empty string if not provided
         if self.scope is None:
             self.scope = ""
 
         # Generate authorization header if token is available
         if self.token:
-            self.auth = f"Bearer {self.token}"
+            if not self.token.strip():
+                warnings.warn(
+                    "OAuth token is empty or whitespace only.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+            else:
+                self.auth = f"Bearer {self.token}"
+
+        # Check for token expiration if both token and expires are set
+        if self.token and self.expires:
+            import time
+            current_time = int(time.time())
+            if self.expires < current_time:
+                warnings.warn(
+                    "OAuth access token appears to be expired. "
+                    "Consider refreshing the token before making requests.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+
+        # Warning if no refresh token is available for token renewal
+        if self.token and not self.refresh:
+            warnings.warn(
+                "OAuth access token is set but no refresh token is available. "
+                "Token renewal may not be possible when the access token expires.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Validate URL format
+        if not self.url.startswith(('http://', 'https://')):
+            warnings.warn(
+                "OAuth token URL does not start with http:// or https://. "
+                "This may not be a valid URL.",
+                UserWarning,
+                stacklevel=3,
+            )

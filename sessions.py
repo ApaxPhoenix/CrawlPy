@@ -1,10 +1,34 @@
-from typing import Optional, Dict, Any, Union, Callable
+from typing import Optional, Dict, Any, Union, Callable, TypeVar, Awaitable
 import aiohttp
-from .crawlpy import CrawlPy
-from .config import Limits, Retry, Timeout, Redirects
-from .settings import SSL, Proxy
-from .broadcast import Response, Stream
-from .auth import Basic, Bearer, JWT, Key, OAuth
+from crawlpy import CrawlPy
+from config import Limits, Retry, Timeout, Redirects
+from settings import SSL, Proxy
+from broadcast import Response, Stream
+from auth import Basic, Bearer, JWT, Key, OAuth
+
+# Enhanced type definitions for improved type safety and clarity
+T = TypeVar("T")
+SessionType = TypeVar("SessionType", bound="Session")
+ResponseType = TypeVar("ResponseType", bound=Response)
+StreamType = TypeVar("StreamType", bound=Stream)
+AuthType = TypeVar("AuthType", bound=Union[Basic, Bearer, JWT, Key, OAuth])
+ConfigType = TypeVar("ConfigType")
+HookType = Callable[..., Awaitable[Any]]
+AdapterType = TypeVar("AdapterType")
+RequestHandlerType = Callable[[aiohttp.ClientRequest], Awaitable[aiohttp.ClientResponse]]
+ResponseHandlerType = Callable[[aiohttp.ClientResponse], Awaitable[Response]]
+CookieJarType = TypeVar("CookieJarType", bound=aiohttp.CookieJar)
+TimeoutType = Union[float, aiohttp.ClientTimeout]
+HeadersType = Dict[str, str]
+CookiesType = Dict[str, str]
+ParamsType = Dict[str, Any]
+DataType = Union[Dict[str, Any], str, bytes]
+FilesType = Dict[str, Any]
+JsonType = Dict[str, Any]
+HooksType = Dict[str, HookType]
+AdaptersType = Dict[str, AdapterType]
+UrlType = str
+HttpMethod = str
 
 
 class Session(CrawlPy):
@@ -23,17 +47,17 @@ class Session(CrawlPy):
 
     def __init__(
         self,
-        endpoint: str,
+        endpoint: UrlType,
         limits: Optional[Limits] = None,
         timeout: Optional[Timeout] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[Redirects] = None,
         proxy: Optional[Proxy] = None,
         ssl: Optional[SSL] = None,
-        auth: Optional[Union[Basic, Bearer, JWT, Key, OAuth]] = None,
-        hooks: Optional[Dict[str, Callable[..., Any]]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        cookies: Optional[Dict[str, str]] = None,
+        auth: Optional[AuthType] = None,
+        hooks: Optional[HooksType] = None,
+        headers: Optional[HeadersType] = None,
+        cookies: Optional[CookiesType] = None,
     ) -> None:
         """Initialize HTTP session with configuration options.
 
@@ -67,12 +91,12 @@ class Session(CrawlPy):
 
         # Initialize session-specific attributes with safe defaults
         # These attributes will be merged with request-specific values
-        self.headers: Dict[str, str] = headers or {}
-        self.cookies: Dict[str, str] = cookies or {}
-        self.hooks: Dict[str, Callable[..., Any]] = hooks or {}
-        self.adapters: Dict[str, Any] = {}
+        self.headers: HeadersType = headers or {}
+        self.cookies: CookiesType = cookies or {}
+        self.hooks: HooksType = hooks or {}
+        self.adapters: AdaptersType = {}
 
-    def mount(self, prefix: str, adapter: Any) -> None:
+    def mount(self, prefix: UrlType, adapter: AdapterType) -> None:
         """Mount an HTTPAdapter instance for a specific URL prefix.
 
         Args:
@@ -86,14 +110,14 @@ class Session(CrawlPy):
 
     async def get(
         self,
-        url: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        params: Optional[ParamsType] = None,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an HTTP GET request.
 
         Args:
@@ -115,13 +139,13 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # Session headers serve as defaults, request headers override
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
         # Similar to headers, session cookies are defaults
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
@@ -137,16 +161,16 @@ class Session(CrawlPy):
 
     async def post(
         self,
-        url: str,
-        data: Optional[Union[Dict[str, Any], str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        files: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        data: Optional[DataType] = None,
+        json: Optional[JsonType] = None,
+        files: Optional[FilesType] = None,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an HTTP POST request.
 
         Args:
@@ -169,12 +193,12 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # Request headers take precedence over session defaults
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
@@ -193,15 +217,15 @@ class Session(CrawlPy):
 
     async def put(
         self,
-        url: str,
-        data: Optional[Union[Dict[str, Any], str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        data: Optional[DataType] = None,
+        json: Optional[JsonType] = None,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an HTTP PUT request.
 
         Args:
@@ -223,12 +247,12 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # This ensures consistent header handling across all HTTP methods
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
@@ -246,15 +270,15 @@ class Session(CrawlPy):
 
     async def patch(
         self,
-        url: str,
-        data: Optional[Union[Dict[str, Any], str]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        data: Optional[DataType] = None,
+        json: Optional[JsonType] = None,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an HTTP PATCH request.
 
         Args:
@@ -276,12 +300,12 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # Consistent header merging pattern across all HTTP methods
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
@@ -299,13 +323,13 @@ class Session(CrawlPy):
 
     async def delete(
         self,
-        url: str,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an HTTP DELETE request.
 
         Args:
@@ -325,30 +349,34 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # DELETE requests don't typically have body data
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
         # Delegate to parent class with merged configuration
         # DELETE requests used for removing resources
         return await super().delete(
-            url, headers=headers, timeout=timeout, redirects=redirects, cookies=cookies
+            url, 
+            headers=headers, 
+            timeout=timeout, 
+            redirects=redirects, 
+            cookies=cookies
         )
 
     async def head(
         self,
-        url: str,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an HTTP HEAD request.
 
         HEAD requests are like GET requests but only return headers,
@@ -371,30 +399,34 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # HEAD requests useful for checking resource existence without downloading
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
         # Delegate to parent class with merged configuration
         # HEAD requests return only headers, no body content
         return await super().head(
-            url, headers=headers, timeout=timeout, redirects=redirects, cookies=cookies
+            url, 
+            headers=headers, 
+            timeout=timeout, 
+            redirects=redirects, 
+            cookies=cookies
         )
 
     async def options(
         self,
-        url: str,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
+        url: UrlType,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
         retry: Optional[Retry] = None,
         redirects: Optional[bool] = None,
-        cookies: Optional[Dict[str, str]] = None,
-    ) -> Optional[Response]:
+        cookies: Optional[CookiesType] = None,
+    ) -> Optional[ResponseType]:
         """Send an OPTIONS request to retrieve allowed methods for the specified URL.
 
         OPTIONS requests are used to check what HTTP methods are supported.
@@ -416,30 +448,34 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # OPTIONS requests used for CORS preflight and capability discovery
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
         # Delegate to parent class with merged configuration
         # OPTIONS requests return supported methods in Allow header
         return await super().options(
-            url, headers=headers, timeout=timeout, redirects=redirects, cookies=cookies
+            url, 
+            headers=headers, 
+            timeout=timeout, 
+            redirects=redirects, 
+            cookies=cookies
         )
 
     async def stream(
         self,
-        method: str,
-        url: str,
-        headers: Optional[Dict[str, str]] = None,
-        timeout: Optional[Union[float, aiohttp.ClientTimeout]] = None,
-        cookies: Optional[Dict[str, str]] = None,
+        method: HttpMethod,
+        url: UrlType,
+        headers: Optional[HeadersType] = None,
+        timeout: Optional[TimeoutType] = None,
+        cookies: Optional[CookiesType] = None,
         **kwargs: Any
-    ) -> Optional[Stream]:
+    ) -> Optional[StreamType]:
         """Send a streaming HTTP request for handling large data transfers.
 
         This method creates a streaming connection that can be used for uploading
@@ -462,17 +498,22 @@ class Session(CrawlPy):
 
         # Merge session headers with request-specific headers
         # Streaming requests benefit from session-level configuration
-        headers = self.headers.copy()
+        headers: HeadersType = self.headers.copy()
         if headers:
             headers.update(headers)
 
         # Merge session cookies with request-specific cookies
-        cookies = self.cookies.copy()
+        cookies: CookiesType = self.cookies.copy()
         if cookies:
             cookies.update(cookies)
 
         # Delegate to parent class with merged configuration
         # Streaming allows processing large responses without memory overhead
         return await super().stream(
-            method, url, headers=headers, timeout=timeout, cookies=cookies, **kwargs
+            method, 
+            url, 
+            headers=headers, 
+            timeout=timeout, 
+            cookies=cookies, 
+            **kwargs
         )

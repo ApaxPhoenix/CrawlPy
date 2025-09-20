@@ -1,5 +1,17 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, TypeVar
+import warnings
+
+# Enhanced type definitions for improved type safety and clarity
+LimitsType = TypeVar("LimitsType", bound="Limits")
+RetryType = TypeVar("RetryType", bound="Retry")
+TimeoutType = TypeVar("TimeoutType", bound="Timeout")
+RedirectsType = TypeVar("RedirectsType", bound="Redirects")
+StatusCodeType = int
+StatusCodesType = List[StatusCodeType]
+ConnectionCountType = int
+TimeoutValueType = float
+RedirectLimitType = int
 
 
 @dataclass
@@ -25,9 +37,9 @@ class Limits:
               Prevents any single host from monopolizing the connection pool.
     """
 
-    connections: int = 50  # Maximum total connections in the pool
-    keepalive: int = 10  # Maximum keepalive connections to maintain
-    host: int = 20  # Maximum connections per host
+    connections: ConnectionCountType = 50  # Maximum total connections in the pool
+    keepalive: ConnectionCountType = 10  # Maximum keepalive connections to maintain
+    host: ConnectionCountType = 20  # Maximum connections per host
 
     def __post_init__(self) -> None:
         """
@@ -73,6 +85,34 @@ class Limits:
         if self.host > self.connections:
             raise ValueError("Per-host connections cannot exceed total connections")
 
+        # Performance warning for very high connection counts
+        if self.connections > 200:
+            warnings.warn(
+                f"Very high connection count configured: {self.connections}. "
+                "This may consume significant system resources and file descriptors. "
+                "Consider if this level of concurrency is necessary.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning for potential keepalive inefficiency
+        if self.keepalive == 0:
+            warnings.warn(
+                "Keepalive connections disabled. This may reduce performance "
+                "for applications making multiple requests to the same hosts.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning for low per-host limits that might bottleneck performance
+        if self.host < 5 and self.connections >= 50:
+            warnings.warn(
+                f"Low per-host limit ({self.host}) with high total connections ({self.connections}). "
+                "This may create bottlenecks when making multiple requests to the same host.",
+                UserWarning,
+                stacklevel=3,
+            )
+
 
 @dataclass
 class Retry:
@@ -100,7 +140,7 @@ class Retry:
 
     total: int = 3  # Total number of retry attempts
     backoff: float = 1.0  # Exponential backoff factor between retries
-    status: Optional[List[int]] = None  # HTTP status codes that trigger retries
+    status: Optional[StatusCodesType] = None  # HTTP status codes that trigger retries
 
     def __post_init__(self) -> None:
         """
@@ -147,6 +187,36 @@ class Retry:
             if not (100 <= code <= 599):
                 raise ValueError(f"Invalid HTTP status code: {code}")
 
+        # Performance warning for excessive retry attempts
+        if self.total > 10:
+            warnings.warn(
+                f"High retry count configured: {self.total}. "
+                "This may cause significant delays for persistent failures "
+                "and increase load on failing servers.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning for very aggressive backoff that might cause long delays
+        if self.backoff > 5.0:
+            warnings.warn(
+                f"High backoff factor configured: {self.backoff}. "
+                "This may cause very long delays between retry attempts.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning for retrying client errors that usually shouldn't be retried
+        client_errors = [code for code in self.status if 400 <= code < 500]
+        if client_errors:
+            warnings.warn(
+                f"Client error codes configured for retry: {client_errors}. "
+                "Client errors (4xx) typically indicate request problems "
+                "that won't resolve with retries.",
+                UserWarning,
+                stacklevel=3,
+            )
+
 
 @dataclass
 class Timeout:
@@ -172,10 +242,10 @@ class Timeout:
               Acts as a failsafe upper bound for the complete request cycle.
     """
 
-    connect: float = 5.0  # Time to wait for initial connection establishment
-    read: float = 30.0  # Time to wait for response data after request sent
-    write: float = 10.0  # Time to wait when sending request data
-    pool: float = 60.0  # Total time limit for the entire request operation
+    connect: TimeoutValueType = 5.0  # Time to wait for initial connection establishment
+    read: TimeoutValueType = 30.0  # Time to wait for response data after request sent
+    write: TimeoutValueType = 10.0  # Time to wait when sending request data
+    pool: TimeoutValueType = 60.0  # Total time limit for the entire request operation
 
     def __post_init__(self) -> None:
         """
@@ -206,9 +276,35 @@ class Timeout:
         # Ensure pool timeout is reasonable compared to individual timeouts
         # The pool timeout should be at least as long as the longest individual timeout
         # to allow operations to complete within their specific timeouts
-        required = max(self.connect, self.read, self.write)
+        required: TimeoutValueType = max(self.connect, self.read, self.write)
         if self.pool < required:
             raise ValueError(f"Pool timeout ({self.pool}) must be at least {required}")
+
+        # Warning for very short timeouts that might be too aggressive
+        if self.connect < 1.0:
+            warnings.warn(
+                f"Very short connect timeout: {self.connect}s. "
+                "This may cause failures on slow networks or distant servers.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        if self.read < 5.0:
+            warnings.warn(
+                f"Very short read timeout: {self.read}s. "
+                "This may cause failures for legitimate slow responses.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning for very long timeouts that might indicate hung requests
+        if self.pool > 300:  # 5 minutes
+            warnings.warn(
+                f"Very long pool timeout: {self.pool}s. "
+                "This may allow requests to hang for extended periods.",
+                UserWarning,
+                stacklevel=3,
+            )
 
 
 @dataclass
@@ -232,7 +328,7 @@ class Redirects:
               Common values range from 5-30, with 10 being a reasonable default.
     """
 
-    limit: int = 10  # Maximum number of redirects to follow
+    limit: RedirectLimitType = 10  # Maximum number of redirects to follow
 
     def __post_init__(self) -> None:
         """
@@ -255,13 +351,22 @@ class Redirects:
         if self.limit < 0:
             raise ValueError("Maximum redirects cannot be negative")
 
-        # Optional: Warn about potentially excessive redirect limits
+        # Warning about potentially excessive redirect limits
         # Very high redirect limits might indicate a configuration error
         # or could be exploited to cause excessive resource usage
         if self.limit > 50:
-            import warnings
-
             warnings.warn(
                 f"Maximum redirects ({self.limit}) is unusually high. "
-                "Consider if this is intentional to avoid potential abuse."
+                "Consider if this is intentional to avoid potential abuse.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+        # Warning when redirects are completely disabled
+        if self.limit == 0:
+            warnings.warn(
+                "Redirect following is disabled. This may cause failures "
+                "when accessing moved resources or load-balanced endpoints.",
+                UserWarning,
+                stacklevel=3,
             )
