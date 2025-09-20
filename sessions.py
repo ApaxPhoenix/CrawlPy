@@ -1,10 +1,10 @@
 from typing import Optional, Dict, Any, Union, Callable, TypeVar, Awaitable
 import aiohttp
-from crawlpy import CrawlPy
-from config import Limits, Retry, Timeout, Redirects
-from settings import SSL, Proxy
-from broadcast import Response, Stream
-from auth import Basic, Bearer, JWT, Key, OAuth
+from .crawlpy import CrawlPy
+from .config import Limits, Retry, Timeout, Redirects
+from .settings import SSL, Proxy
+from .broadcast import Response, Stream
+from .auth import Basic, Bearer, JWT, Key, OAuth
 
 # Enhanced type definitions for improved type safety and clarity
 T = TypeVar("T")
