@@ -1,9 +1,9 @@
 from typing import Optional, Dict, Union, TypeVar
 from dataclasses import dataclass
 import warnings
-from config import Retry, Timeout
-from settings import SSL, Proxy
-from auth import Basic, Bearer, JWT, Key, OAuth
+from .config import Retry, Timeout
+from .settings import SSL, Proxy
+from .auth import Basic, Bearer, JWT, Key, OAuth
 
 # Enhanced type definitions for improved type safety and clarity
 HTTPAdapterType = TypeVar("HTTPAdapterType", bound="HTTPAdapter")
