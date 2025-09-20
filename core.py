@@ -529,15 +529,15 @@ class CrawlCore:
 
             # Generate proxy URL
             # This creates the proxy URL with optional authentication
-            proxy_url: ProxyUrl
+            url: ProxyUrl
             if self.proxy.username and self.proxy.password:
-                proxy_url = (
+                url = (
                     f"http://{self.proxy.username}:{self.proxy.password}@{self.proxy.host}:{self.proxy.port}"
                 )
             else:
-                proxy_url = f"http://{self.proxy.host}:{self.proxy.port}"
+                url = f"http://{self.proxy.host}:{self.proxy.port}"
 
-            kwargs["proxy"] = proxy_url
+            kwargs["proxy"] = url
 
             # Add proxy headers if configured
             # This allows custom proxy headers to be sent

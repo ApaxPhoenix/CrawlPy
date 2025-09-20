@@ -29,4 +29,9 @@ setup(
     ],
     # Python version requirement
     python_requires=">=3.9",  # Minimum Python version required
+    # Additional package metadata
+    keywords="web, crawler, scraping, data extraction, http, parsing, automation",  # Search keywords for PyPI
+    license="MIT",  # Package license
+    zip_safe=False,  # Set to False for packages with data files or C extensions
+    include_package_data=True,  # Include files specified in MANIFEST.in
 )
